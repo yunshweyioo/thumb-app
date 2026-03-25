@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Spam War</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #07070f;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    user-select: none;
+    overflow: hidden;
+    gap: 10px;
+    animation: bodyThud 0.35s ease-out 0.05s both;
+  }
+  @keyframes bodyThud {
+    0%   { transform: translateY(0); }
+    30%  { transform: translateY(-4px); }
+    60%  { transform: translateY(2px); }
+    80%  { transform: translateY(-1px); }
+    100% { transform: translateY(0); }
+  }
+
+  /* ── Title ── */
+  #title {
+    font-family: 'Bangers', Impact, cursive;
+    font-size: 5.2rem;
+    letter-spacing: 10px;
+    line-height: 1;
+  }
+  #title .p1 {
+    display: inline-block;
+    color: #ffffff;
+    text-shadow: 0 0 30px rgba(190,120,255,0.5), 0 3px 0 #0a0015;
+    animation:
+      wordSlam 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
+      wordBob  3s    ease-in-out 0.7s infinite;
+  }
+  #title .p2 {
+    display: inline-block;
+    color: #ffffff;
+    text-shadow: 0 0 30px rgba(190,120,255,0.5), 0 3px 0 #0a0015;
+    animation:
+      wordSlam 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.13s both,
+      wordBob  3s    ease-in-out 0.83s infinite;
+  }
+
+  @keyframes wordSlam {
+    0% {
+      transform: translateY(-110px) scale(1.7) rotate(-3deg);
+      opacity: 0;
+      filter: blur(8px);
+    }
+    55% {
+      transform: translateY(10px) scale(0.91) rotate(0.5deg);
+      opacity: 1;
+      filter: blur(0);
+    }
+    75% { transform: translateY(-5px) scale(1.04) rotate(-0.3deg); }
+    90% { transform: translateY(2px)  scale(0.99); }
+    100%{ transform: translateY(0)    scale(1)    rotate(0); }
+  }
+  @keyframes wordBob {
+    0%,100% { transform: translateY(0)   rotate(-0.4deg); }
+    50%     { transform: translateY(-5px) rotate(0.4deg); }
+  }
+
+  /* ── Tagline ── */
+  #tagline {
+    font-family: 'Fredoka', 'Segoe UI', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 500;
+    letter-spacing: 3px;
+    color: rgba(255,255,255,0.28);
+    text-transform: uppercase;
+    margin-top: -4px;
+    animation: taglineFade 0.5s ease-out 0.65s both;
+  }
+  @keyframes taglineFade {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+
+  /* ── Impact flash ── */
+  #slam-flash {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 30% at 50% 18%, white, transparent 70%);
+    pointer-events: none;
+    z-index: 999;
+    animation: slamFlash 0.55s ease-out 0.05s both;
+  }
+  @keyframes slamFlash {
+    0%   { opacity: 0; }
+    18%  { opacity: 0.18; }
+    100% { opacity: 0; }
+  }
+
+  canvas { display: block; border-radius: 16px; }
+</style>
+</head>
+<body>
+
+<div id="slam-flash"></div>
+<div id="title"><span class="p1">SPAM</span> <span class="p2">WAR</span></div>
+<div id="tagline">tap faster &nbsp;·&nbsp; win harder</div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+// ── Crisp canvas on retina / high-DPI screens ─────────────────────────────────
+const W = 820, H = 420;
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width        = W * DPR;
+canvas.height       = H * DPR;
+canvas.style.width  = W + 'px';
+canvas.style.height = H + 'px';
+ctx.scale(DPR, DPR);
+
+// ── Colors ────────────────────────────────────────────────────────────────────
+const P1C = '#5ba8e8';
+const P2C = '#e85b5b';
+
+// ── Bar geometry ──────────────────────────────────────────────────────────────
+const BAR_Y    = 248;
+const BAR_CX   = W / 2;
+const BAR_HALF = 180;
+const BAR_H    = 30;
+const ORB_R    = 19;
+
+// ── Game tuning ───────────────────────────────────────────────────────────────
+const TAP_STEP   = 0.068;
+const DRIFT_SPD  = 0.10;
+const ROUND_TIME = 30;
+
+// ── Audio ─────────────────────────────────────────────────────────────────────
+let ac = null;
+function getAC() {
+  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (ac.state === 'suspended') ac.resume();
+  return ac;
+}
+// Scott Pilgrim style — cycling chiptune hit sounds, pitch scales with tap speed
+const SP_SCALES = [
+  [1, 1.5], [1.25, 1.78], [1.5, 2], [1.12, 1.68], [0.89, 1.33], [1.33, 1.78],
+];
+const spIdx = [0, 0];
+function sfxTap(player) {
+  try {
+    const a   = getAC();
+    const t   = a.currentTime;
+    const tps = getTPS(player);
+    // Base pitch: P1 higher/brighter, P2 lower/punchier
+    const root  = player === 1 ? 587 : 440;  // D5 vs A4
+    const boost = 1 + Math.min(tps / 20, 0.3);  // pitch creeps up when spamming fast
+    const [r1, r2] = SP_SCALES[spIdx[player-1] % SP_SCALES.length];
+    spIdx[player-1]++;
+
+    // ── Layer 1: punchy square-wave sweep ──
+    const o1 = a.createOscillator(), g1 = a.createGain();
+    o1.connect(g1); g1.connect(a.destination);
+    o1.type = 'square';
+    o1.frequency.setValueAtTime(root * r2 * boost, t);
+    o1.frequency.exponentialRampToValueAtTime(root * r1 * boost * 0.55, t + 0.06);
+    g1.gain.setValueAtTime(0.13, t);
+    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    o1.start(t); o1.stop(t + 0.09);
+
+    // ── Layer 2: sub-octave thud ──
+    const o2 = a.createOscillator(), g2 = a.createGain();
+    o2.connect(g2); g2.connect(a.destination);
+    o2.type = 'square';
+    o2.frequency.setValueAtTime(root * r1 * boost * 0.5, t);
+    o2.frequency.exponentialRampToValueAtTime(root * boost * 0.25, t + 0.05);
+    g2.gain.setValueAtTime(0.07, t);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    o2.start(t); o2.stop(t + 0.06);
+
+    // ── Layer 3: noise burst (percussive crunch) ──
+    const bufLen = Math.floor(a.sampleRate * 0.04);
+    const buf    = a.createBuffer(1, bufLen, a.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+    const noise  = a.createBufferSource();
+    noise.buffer = buf;
+    const gn     = a.createGain();
+    noise.connect(gn); gn.connect(a.destination);
+    gn.gain.setValueAtTime(0.055, t);
+    gn.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    noise.start(t); noise.stop(t + 0.04);
+  } catch (_) {}
+}
+function sfxCountdown(isGo) {
+  try {
+    const a = getAC(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.frequency.value = isGo ? 880 : 440;
+    o.type = 'sine';
+    g.gain.setValueAtTime(0.18, a.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + (isGo ? 0.25 : 0.1));
+    o.start(); o.stop(a.currentTime + (isGo ? 0.25 : 0.1));
+  } catch (_) {}
+}
+function sfxWin(player) {
+  try {
+    const a = getAC();
+    const freqs = player === 1 ? [523,659,784,1047] : [392,494,587,784];
+    freqs.forEach((f, i) => {
+      const o = a.createOscillator(), g = a.createGain();
+      o.connect(g); g.connect(a.destination);
+      const t = a.currentTime + i * 0.11;
+      o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.18, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+      o.start(t); o.stop(t + 0.35);
+    });
+  } catch (_) {}
+}
+let pinTone = null;
+function startPinTone() {
+  if (pinTone) return;
+  try {
+    const a = getAC(), o = a.createOscillator(), g = a.createGain();
+    o.connect(g); g.connect(a.destination);
+    o.type = 'sawtooth'; o.frequency.value = 80;
+    g.gain.setValueAtTime(0, a.currentTime);
+    g.gain.linearRampToValueAtTime(0.04, a.currentTime + 0.3);
+    o.start();
+    pinTone = { o, g };
+  } catch (_) {}
+}
+function updatePinTone(prog) {
+  if (!pinTone) return;
+  try {
+    const a = getAC();
+    pinTone.o.frequency.setTargetAtTime(80 + prog * 280, a.currentTime, 0.05);
+    pinTone.g.gain.setTargetAtTime(0.025 + prog * 0.05, a.currentTime, 0.05);
+  } catch (_) {}
+}
+function stopPinTone() {
+  if (!pinTone) return;
+  try {
+    const a = getAC();
+    pinTone.g.gain.linearRampToValueAtTime(0, a.currentTime + 0.12);
+    pinTone.o.stop(a.currentTime + 0.12);
+  } catch (_) {}
+  pinTone = null;
+}
+
+// ── Particles ─────────────────────────────────────────────────────────────────
+const particles = [];
+function burst(player, orbX, big) {
+  const color = player === 1 ? P1C : P2C;
+  const count = big ? 28 : 9;
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.6;
+    const spd   = big ? (80 + Math.random() * 220) : (50 + Math.random() * 130);
+    particles.push({
+      x: orbX, y: BAR_Y,
+      vx: Math.cos(angle) * spd * (player === 1 ? 0.7 : -0.7) + (Math.random()-0.5)*80,
+      vy: Math.sin(angle) * spd,
+      r: big ? (4 + Math.random() * 7) : (2 + Math.random() * 4),
+      life: 1.0, decay: big ? 1.6 : 2.4, color,
+    });
+  }
+}
+function tickParticles(dt) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vy += 200 * dt; p.vx *= (1 - 1.5 * dt);
+    p.life -= p.decay * dt;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+function drawParticles() {
+  for (const p of particles) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.life) * 0.85;
+    ctx.shadowColor = p.color; ctx.shadowBlur = 6;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * Math.max(0.1, p.life), 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ── Screen shake ──────────────────────────────────────────────────────────────
+let shakeAmt = 0;
+function addShake(v) { shakeAmt = Math.max(shakeAmt, v); }
+function tickShake(dt) { shakeAmt = Math.max(0, shakeAmt - dt * 18); }
+function getShakeOffset() {
+  return shakeAmt > 0.2
+    ? { x: (Math.random()-0.5)*shakeAmt*14, y: (Math.random()-0.5)*shakeAmt*14 }
+    : { x: 0, y: 0 };
+}
+
+// ── Screen flash ──────────────────────────────────────────────────────────────
+let flashAlpha = 0, flashCol = '#fff';
+function addFlash(col, a = 1) { flashAlpha = a; flashCol = col; }
+function tickFlash(dt) { flashAlpha = Math.max(0, flashAlpha - dt * 4); }
+
+// ── Orb bounce ────────────────────────────────────────────────────────────────
+let orbBounce = 0;
+function triggerOrbBounce() { orbBounce = 1; }
+function tickOrb(dt) { orbBounce = Math.max(0, orbBounce - dt * 8); }
+
+// ── Orb trail ─────────────────────────────────────────────────────────────────
+const orbTrail = [];
+function pushTrail(x) {
+  orbTrail.push({ x, age: 0 });
+  if (orbTrail.length > 18) orbTrail.shift();
+}
+function tickTrail(dt) { orbTrail.forEach(t => t.age += dt); }
+
+// ── Tap history (TPS) ─────────────────────────────────────────────────────────
+const tapHistory = [[], []];
+function recordTap(player) { tapHistory[player-1].push(performance.now()); }
+function getTPS(player) {
+  const now = performance.now();
+  tapHistory[player-1] = tapHistory[player-1].filter(t => now - t < 1000);
+  return tapHistory[player-1].length;
+}
+
+// ── Vertical energy meters ────────────────────────────────────────────────────
+const meterLevel = [0, 0];   // smooth 0-1
+const meterPeak  = [0, 0];   // held peak indicator 0-1
+const meterPeakT = [0, 0];   // timer before peak falls
+
+function spikeMe(player) {
+  const p = player - 1;
+  meterLevel[p] = Math.min(1, meterLevel[p] + 0.18);
+  if (meterLevel[p] >= meterPeak[p]) { meterPeak[p] = meterLevel[p]; meterPeakT[p] = 0.55; }
+}
+function tickMeters(dt) {
+  for (let p = 0; p < 2; p++) {
+    const target = Math.min(getTPS(p + 1) / 10, 1);
+    meterLevel[p] += (target > meterLevel[p] ? 10 : 3) * dt * (target - meterLevel[p]);
+    meterLevel[p] = Math.max(0, Math.min(1, meterLevel[p]));
+    meterPeakT[p] -= dt;
+    if (meterPeakT[p] < 0) meterPeak[p] = Math.max(meterLevel[p], meterPeak[p] - dt * 1.5);
+  }
+}
+
+const METER_SEGS = 12;
+const METER_H    = 188;
+const METER_W    = 16;
+const METER_GAP  = 3;
+const SEG_H      = (METER_H - (METER_SEGS - 1) * METER_GAP) / METER_SEGS;
+
+function drawMeter(player) {
+  const isP1 = player === 1;
+  const mx   = isP1 ? 26 : W - 26;
+  const col  = isP1 ? P1C : P2C;
+  const lv   = meterLevel[player - 1];
+  const pk   = meterPeak[player - 1];
+  const topY = BAR_Y - METER_H / 2;
+
+  for (let i = 0; i < METER_SEGS; i++) {
+    const frac = (i + 1) / METER_SEGS;          // 0..1 bottom→top
+    const sy   = topY + METER_H - (i + 1) * SEG_H - i * METER_GAP;
+    const on   = frac <= lv;
+    // Colour ramp: green → yellow → red (same for both players)
+    const segCol = on
+      ? (frac > 0.75 ? '#ff3c3c' : frac > 0.45 ? '#ffc400' : '#3ddc84')
+      : null;
+    const dimCol = frac > 0.75 ? '#ff3c3c' : frac > 0.45 ? '#ffc400' : '#3ddc84';
+
+    ctx.save();
+    if (on) { ctx.shadowColor = segCol; ctx.shadowBlur = frac > 0.75 ? 10 : 5; }
+    ctx.beginPath(); ctx.roundRect(mx - METER_W/2, sy, METER_W, SEG_H, 2);
+    ctx.fillStyle = on ? segCol : hexAlpha(dimCol, 0.09);
+    ctx.fill();
+    if (!on) { ctx.strokeStyle = hexAlpha(dimCol, 0.18); ctx.lineWidth = 1; ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // Peak tick
+  if (pk > 0.04) {
+    const peakFrac = pk;
+    const psy = topY + METER_H - peakFrac * (METER_H) - 1;
+    ctx.save();
+    const pkCol = peakFrac > 0.75 ? '#ff3c3c' : peakFrac > 0.45 ? '#ffc400' : '#3ddc84';
+    ctx.shadowColor = pkCol; ctx.shadowBlur = 8;
+    ctx.fillStyle   = '#fff';
+    ctx.beginPath(); ctx.roundRect(mx - METER_W/2, psy, METER_W, 3, 1); ctx.fill();
+    ctx.restore();
+  }
+
+  // Label
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 10px Fredoka, Segoe UI';
+  ctx.fillStyle = hexAlpha(col, 0.45);
+  txt('PWR', mx, topY - 11);
+}
+
+// ── Score pop ─────────────────────────────────────────────────────────────────
+let scoreScale = [1, 1];
+function triggerScorePop(p) { scoreScale[p-1] = 1.7; }
+function tickScorePop(dt) {
+  scoreScale[0] = Math.max(1, scoreScale[0] - dt * 5);
+  scoreScale[1] = Math.max(1, scoreScale[1] - dt * 5);
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let state;
+function initState() {
+  state = {
+    balance: 0,
+    scores: [0, 0], round: 1,
+    phase: 'countdown', countdown: 3, cdTimer: 1.0, cdScale: 1.6,
+    reTimer: 0, roundWinner: null,
+    roundTimer: ROUND_TIME,
+    tapFlash: [0, 0], tapCount: [0, 0],
+  };
+  particles.length = orbTrail.length = 0;
+  orbBounce = shakeAmt = flashAlpha = 0;
+  scoreScale = [1, 1];
+  meterLevel[0] = meterLevel[1] = meterPeak[0] = meterPeak[1] = 0;
+  meterPeakT[0] = meterPeakT[1] = 0;
+  spIdx[0] = spIdx[1] = 0;
+  tapHistory[0].length = tapHistory[1].length = 0;
+}
+initState();
+
+// Shake the canvas in sync with each word slamming in
+setTimeout(() => addShake(0.9), 50);   // SPAM lands ~50ms in
+setTimeout(() => addShake(0.65), 180); // WAR lands ~130ms later
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (['a','l'].includes(k)) e.preventDefault();
+  if (k === 'r' && state.phase === 'gameOver') { initState(); return; }
+  if (state.phase !== 'playing') return;
+  if (k === 'a') onTap(1);
+  if (k === 'l') onTap(2);
+});
+function onTap(player) {
+  const orbX = BAR_CX + state.balance * BAR_HALF;
+  if (player === 1) state.balance = Math.min( 1, state.balance + TAP_STEP);
+  else              state.balance = Math.max(-1, state.balance - TAP_STEP);
+  state.tapFlash[player-1] = 0.18;
+  state.tapCount[player-1]++;
+  recordTap(player);
+  triggerOrbBounce();
+  spikeMe(player);
+  burst(player, orbX, false);
+  sfxTap(player);
+}
+
+// ── Game logic ────────────────────────────────────────────────────────────────
+function tickGame(dt) {
+  // Always drift orb back to center
+  if      (state.balance > 0) state.balance = Math.max(0, state.balance - DRIFT_SPD * dt);
+  else if (state.balance < 0) state.balance = Math.min(0, state.balance + DRIFT_SPD * dt);
+
+  // Round countdown
+  state.roundTimer -= dt;
+  if (state.roundTimer <= 5 && Math.floor(state.roundTimer + dt) > Math.floor(state.roundTimer)) {
+    addShake(0.2); // light shake each second in final 5s
+  }
+  if (state.roundTimer <= 0) {
+    // Whoever's side the orb is on wins; tap count breaks ties
+    if      (state.balance > 0.01)  winRound(1);
+    else if (state.balance < -0.01) winRound(2);
+    else if (state.tapCount[0] >= state.tapCount[1]) winRound(1);
+    else    winRound(2);
+    return;
+  }
+
+  state.tapFlash[0] = Math.max(0, state.tapFlash[0] - dt * 6);
+  state.tapFlash[1] = Math.max(0, state.tapFlash[1] - dt * 6);
+
+  const orbX = BAR_CX + state.balance * BAR_HALF;
+  pushTrail(orbX);
+  tickParticles(dt); tickOrb(dt); tickTrail(dt);
+  tickShake(dt); tickFlash(dt); tickScorePop(dt); tickMeters(dt);
+}
+function winRound(player) {
+  state.scores[player-1]++;
+  state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 2.8;
+  const orbX = BAR_CX + state.balance * BAR_HALF;
+  burst(player, orbX, true); burst(player, orbX, true);
+  addShake(1.2); addFlash(player === 1 ? P1C : P2C, 0.6);
+  sfxWin(player); triggerScorePop(player);
+}
+function nextRound() {
+  if (state.scores[0] >= 2 || state.scores[1] >= 2) {
+    state.phase = 'gameOver';
+  } else {
+    state.round++; state.balance = 0; state.tapCount = [0,0];
+    state.roundTimer = ROUND_TIME;
+    state.phase = 'countdown'; state.countdown = 3;
+    state.cdTimer = 1.0; state.cdScale = 1.6;
+    particles.length = orbTrail.length = 0;
+    tapHistory[0].length = tapHistory[1].length = 0;
+  }
+}
+
+// ── Main loop ─────────────────────────────────────────────────────────────────
+let lastTime = null;
+function loop(ts) {
+  if (!lastTime) lastTime = ts;
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  if (state.phase === 'countdown') {
+    state.cdTimer -= dt;
+    state.cdScale = Math.max(1, state.cdScale - dt * 4.5);
+    if (state.cdTimer <= 0) {
+      if (state.countdown > 1) {
+        state.countdown--; state.cdTimer = 1.0; state.cdScale = 1.6; sfxCountdown(false);
+      } else if (state.countdown === 1) {
+        state.countdown = 0; state.cdTimer = 0.6; state.cdScale = 1.6; sfxCountdown(true);
+      } else {
+        state.phase = 'playing'; state.tapCount = [0,0];
+      }
+    }
+    tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt); tickMeters(dt);
+  } else if (state.phase === 'playing') {
+    tickGame(dt);
+  } else if (state.phase === 'roundEnd') {
+    tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt);
+    state.reTimer -= dt;
+    if (state.reTimer <= 0) nextRound();
+  } else if (state.phase === 'gameOver') {
+    tickParticles(dt); tickFlash(dt);
+  }
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function hexAlpha(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n>>16},${(n>>8)&255},${n&255},${a.toFixed(3)})`;
+}
+function shadeHex(hex, d) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgb(${Math.min(255,Math.max(0,(n>>16)+d))},${Math.min(255,Math.max(0,((n>>8)&255)+d))},${Math.min(255,Math.max(0,(n&255)+d))})`;
+}
+// Draw text with no shadow bleed — always resets shadow state first
+function txt(text, x, y) {
+  ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
+  ctx.fillText(text, x, y);
+}
+
+// ── Draw: background ──────────────────────────────────────────────────────────
+function drawBg() {
+  ctx.fillStyle = '#07070f';
+  ctx.fillRect(0, 0, W, H);
+
+  // Vignette
+  const vg = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.85);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
+  for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  ctx.restore();
+
+  // Side glow based on who's ahead
+  if (Math.abs(state.balance) > 0.05) {
+    const col = state.balance > 0 ? P1C : P2C;
+    const gx  = state.balance > 0 ? 0 : W;
+    const mag = Math.abs(state.balance);
+    const sg  = ctx.createRadialGradient(gx, H/2, 0, gx, H/2, W * 0.6);
+    sg.addColorStop(0, hexAlpha(col, mag * 0.09));
+    sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+  }
+}
+
+// ── Draw: score header ────────────────────────────────────────────────────────
+function drawScore() {
+  const cx = W / 2;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // Player labels
+  ctx.font = '600 12px Fredoka, Segoe UI';
+  ctx.fillStyle = hexAlpha(P1C, 0.7); txt('PLAYER 1', cx - 155, 20);
+  ctx.fillStyle = hexAlpha(P2C, 0.7); txt('PLAYER 2', cx + 155, 20);
+
+  // Score numbers — no shadow on text, use scale for pop
+  ctx.save();
+  ctx.translate(cx - 155, 68);
+  ctx.scale(scoreScale[0], scoreScale[0]);
+  ctx.font = 'bold 60px Segoe UI';
+  ctx.fillStyle = P1C;
+  txt(state.scores[0], 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(cx + 155, 68);
+  ctx.scale(scoreScale[1], scoreScale[1]);
+  ctx.font = 'bold 60px Segoe UI';
+  ctx.fillStyle = P2C;
+  txt(state.scores[1], 0, 0);
+  ctx.restore();
+
+  // VS pill — glow on the shape, not on text
+  const vsY = 62;
+  ctx.save();
+  ctx.shadowColor = 'rgba(180,120,255,0.55)'; ctx.shadowBlur = 16;
+  ctx.beginPath(); ctx.roundRect(cx - 30, vsY - 18, 60, 36, 18);
+  ctx.fillStyle = '#18112a';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(180,120,255,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
+  // VS text — no shadow
+  ctx.font = 'bold 22px Segoe UI';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'right';
+  ctx.fillStyle = P1C; txt('V', cx - 2, vsY);
+  ctx.textAlign = 'left';
+  ctx.fillStyle = P2C; txt('S', cx + 2, vsY);
+
+  // Round row
+  const rowY = 108;
+  const pipR = 7, pipGap = 18;
+
+  // Round label
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '600 14px Fredoka, Segoe UI';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  txt(`Round ${state.round} of 3`, cx, rowY);
+
+  // P1 pips (left)
+  for (let i = 0; i < 2; i++) {
+    const px = cx - 105 + i * (pipR*2 + 6);
+    const won = i < state.scores[0];
+    ctx.save();
+    if (won) { ctx.shadowColor = P1C; ctx.shadowBlur = 14; }
+    ctx.beginPath(); ctx.arc(px, rowY, pipR, 0, Math.PI * 2);
+    ctx.fillStyle = won ? P1C : 'rgba(255,255,255,0.1)';
+    ctx.fill();
+    if (!won) { ctx.strokeStyle = hexAlpha(P1C, 0.3); ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.restore();
+  }
+
+  // P2 pips (right)
+  for (let i = 0; i < 2; i++) {
+    const px = cx + 85 + i * (pipR*2 + 6);
+    const won = i < state.scores[1];
+    ctx.save();
+    if (won) { ctx.shadowColor = P2C; ctx.shadowBlur = 14; }
+    ctx.beginPath(); ctx.arc(px, rowY, pipR, 0, Math.PI * 2);
+    ctx.fillStyle = won ? P2C : 'rgba(255,255,255,0.1)';
+    ctx.fill();
+    if (!won) { ctx.strokeStyle = hexAlpha(P2C, 0.3); ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+// ── Draw: tug-of-war bar ──────────────────────────────────────────────────────
+function drawBar() {
+  const bx = BAR_CX - BAR_HALF;
+  const by = BAR_Y - BAR_H / 2;
+  const bw = BAR_HALF * 2;
+  const r  = BAR_H / 2;
+
+  // Track bg
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, r);
+  ctx.fillStyle = '#0e0e1c'; ctx.fill();
+  ctx.restore();
+
+  // Fill
+  if (Math.abs(state.balance) > 0.01) {
+    const isP1  = state.balance > 0;
+    const fillW = Math.abs(state.balance) * BAR_HALF;
+    const fillX = isP1 ? BAR_CX : BAR_CX - fillW;
+    const col   = isP1 ? P1C : P2C;
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(fillX, by + 4, fillW, BAR_H - 8, 4);
+    const g = ctx.createLinearGradient(fillX, 0, fillX + fillW, 0);
+    if (isP1) { g.addColorStop(0, hexAlpha(col, 0.08)); g.addColorStop(1, col); }
+    else       { g.addColorStop(0, col); g.addColorStop(1, hexAlpha(col, 0.08)); }
+    ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+  }
+
+  // Center mark
+  ctx.save();
+  ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(BAR_CX, by); ctx.lineTo(BAR_CX, by+BAR_H); ctx.stroke();
+  ctx.restore();
+
+  // Track border
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, r);
+  ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
+
+  // Trail
+  const orbX = BAR_CX + state.balance * BAR_HALF;
+  const trailCol = state.balance > 0.05 ? P1C : state.balance < -0.05 ? P2C : '#aaa';
+  for (const t of orbTrail) {
+    const frac = 1 - t.age / 0.25;
+    if (frac <= 0) continue;
+    ctx.save();
+    ctx.globalAlpha = frac * 0.22;
+    ctx.beginPath(); ctx.arc(t.x, BAR_Y, ORB_R * frac * 0.5, 0, Math.PI * 2);
+    ctx.fillStyle = trailCol; ctx.fill();
+    ctx.restore();
+  }
+
+  // Orb — glow on the shape only
+  const curR = ORB_R * (1 + orbBounce * 0.35);
+  const orbCol = state.balance > 0.05 ? P1C : state.balance < -0.05 ? P2C : '#b0b8cc';
+  ctx.save();
+  ctx.shadowColor = orbCol;
+  ctx.shadowBlur  = 12;
+  ctx.beginPath(); ctx.arc(orbX, BAR_Y, curR, 0, Math.PI * 2);
+  const og = ctx.createRadialGradient(orbX-5, BAR_Y-6, 1, orbX, BAR_Y, curR);
+  og.addColorStop(0, '#ffffff');
+  og.addColorStop(0.3, orbCol);
+  og.addColorStop(1, shadeHex(orbCol, -40));
+  ctx.fillStyle = og; ctx.fill();
+  ctx.restore();
+}
+
+// ── Draw: player side panels ──────────────────────────────────────────────────
+function drawPlayers() {
+  const p1x = 62, p2x = W - 62, py = BAR_Y;
+
+  function side(px, player, flash, tps) {
+    const col = player === 1 ? P1C : P2C;
+    const key = player === 1 ? 'A' : 'L';
+    const fa  = flash / 0.18;
+
+    // Key circle — glow on shape only
+    ctx.save();
+    if (flash > 0) { ctx.shadowColor = col; ctx.shadowBlur = 32 * fa; }
+    ctx.beginPath(); ctx.arc(px, py, 32, 0, Math.PI * 2);
+    ctx.fillStyle = flash > 0 ? hexAlpha(col, 0.15 + 0.2 * fa) : hexAlpha(col, 0.07);
+    ctx.fill();
+    ctx.strokeStyle = flash > 0 ? col : hexAlpha(col, 0.3);
+    ctx.lineWidth = flash > 0 ? 2.5 : 1.5; ctx.stroke();
+    ctx.restore();
+
+    // Key letter — no shadow
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = 'bold 20px monospace';
+    ctx.fillStyle = flash > 0 ? '#fff' : col;
+    txt(key, px, py);
+
+    // TPS speed bar
+    const barY = py + 50, barW = 48, barH = 7;
+    const filled = Math.min(tps / 12, 1);
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(px - barW/2, barY, barW, barH, 3);
+    ctx.fillStyle = '#0e0e1c'; ctx.fill();
+    if (filled > 0) {
+      ctx.beginPath(); ctx.roundRect(px - barW/2, barY, barW * filled, barH, 3);
+      const sg = ctx.createLinearGradient(px - barW/2, 0, px + barW/2, 0);
+      sg.addColorStop(0, hexAlpha(col, 0.35)); sg.addColorStop(1, col);
+      ctx.fillStyle = sg; ctx.fill();
+    }
+    ctx.restore();
+
+    // Stats text — no shadow, readable opacity
+    ctx.font = '600 13px Fredoka, Segoe UI';
+    ctx.fillStyle = hexAlpha(col, 0.85);
+    txt(`${tps} t/s`, px, barY + barH + 14);
+
+    ctx.font = '11px Segoe UI';
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    txt(`${state.tapCount[player-1]} taps`, px, barY + barH + 29);
+  }
+
+  side(p1x, 1, state.tapFlash[0], getTPS(1));
+  side(p2x, 2, state.tapFlash[1], getTPS(2));
+}
+
+// ── Draw: round timer ─────────────────────────────────────────────────────────
+function drawRoundTimer() {
+  const t    = Math.max(0, state.roundTimer);
+  const secs = Math.ceil(t);
+  const cx   = W / 2;
+  const cy   = BAR_Y - 72;
+  const urgent = t <= 5;
+  const color  = urgent ? '#ff4444' : 'rgba(255,255,255,0.75)';
+
+  // Arc progress track
+  const prog = t / ROUND_TIME;
+  const arcR = 26;
+  ctx.save();
+  ctx.beginPath(); ctx.arc(cx, cy, arcR, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 5; ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx, cy, arcR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog, false);
+  if (urgent) { ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 14; }
+  ctx.strokeStyle = urgent ? '#ff4444' : 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.restore();
+
+  // Number inside
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `bold ${urgent ? 22 : 20}px Segoe UI`;
+  ctx.fillStyle = color;
+  txt(secs, cx, cy);
+
+  // "FINAL 5!" banner
+  if (urgent) {
+    ctx.font = '600 11px Fredoka, Segoe UI';
+    ctx.fillStyle = '#ff6666';
+    txt('FINAL 5!', cx, cy + arcR + 13);
+  }
+}
+
+// ── Draw: countdown ───────────────────────────────────────────────────────────
+function drawCountdown() {
+  const text = state.countdown > 0 ? String(state.countdown) : 'GO!';
+  ctx.save();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.translate(W/2, H/2 - 10);
+  ctx.scale(state.cdScale, state.cdScale);
+  if (state.countdown === 0) {
+    ctx.font = 'bold 88px Segoe UI'; ctx.fillStyle = '#50e878';
+    ctx.shadowColor = '#50e878'; ctx.shadowBlur = 40;
+  } else {
+    ctx.font = 'bold 104px Segoe UI'; ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.35)'; ctx.shadowBlur = 28;
+  }
+  ctx.fillText(text, 0, 0); // countdown glow is intentional here
+  ctx.restore();
+}
+
+// ── Draw: overlays ────────────────────────────────────────────────────────────
+function drawOverlay(color, title, sub) {
+  ctx.fillStyle = 'rgba(0,0,0,0.68)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // Title glow — drawn as bg shape, then crisp text on top
+  ctx.save();
+  ctx.font = 'bold 50px Segoe UI';
+  ctx.shadowColor = color; ctx.shadowBlur = 45;
+  ctx.fillStyle = color; ctx.fillText(title, W/2, H/2 - 28);
+  ctx.restore();
+  // Crisp text pass over the blurred one
+  ctx.font = 'bold 50px Segoe UI';
+  ctx.fillStyle = color;
+  txt(title, W/2, H/2 - 28);
+
+  ctx.font = '600 17px Fredoka, Segoe UI';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  txt(sub, W/2, H/2 + 24);
+}
+
+// ── Draw: screen flash ────────────────────────────────────────────────────────
+function drawScreenFlash() {
+  if (flashAlpha <= 0) return;
+  const fg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.7);
+  fg.addColorStop(0,   hexAlpha(flashCol, flashAlpha * 0.45));
+  fg.addColorStop(0.5, hexAlpha(flashCol, flashAlpha * 0.2));
+  fg.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = fg; ctx.fillRect(0, 0, W, H);
+}
+
+// ── Main draw ─────────────────────────────────────────────────────────────────
+function draw() {
+  const { x: sx, y: sy } = getShakeOffset();
+  ctx.save();
+  ctx.translate(sx, sy);
+
+  drawBg();
+  drawScore();
+  drawMeter(1);
+  drawMeter(2);
+  drawBar();
+  drawPlayers();
+  drawParticles();
+
+  if      (state.phase === 'playing')   { drawRoundTimer(); }
+  else if (state.phase === 'countdown') { drawCountdown(); }
+  else if (state.phase === 'roundEnd')  {
+    const col = state.roundWinner === 1 ? P1C : P2C;
+    drawOverlay(col, `Player ${state.roundWinner} wins the round!`, 'Next round starting…');
+  }
+  else if (state.phase === 'gameOver')  {
+    const w = state.scores[0] >= 2 ? 1 : 2;
+    drawOverlay(w === 1 ? P1C : P2C,
+      `Player ${w} wins the match!`,
+      `${state.scores[0]} – ${state.scores[1]}   ·   press R to play again`);
+  }
+
+  drawScreenFlash();
+  ctx.restore();
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
