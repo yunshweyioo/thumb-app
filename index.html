@@ -27,7 +27,6 @@
     flex-direction: column;
     align-items: center;
     gap: 10px;
-    transform-origin: top center;
   }
   @keyframes bodyThud {
     0%   { transform: translateY(0); }
@@ -2034,10 +2033,21 @@ function draw() {
 })();
 
 // ── Mobile scaling ────────────────────────────────────────────────────────────
+// Directly set CSS properties on each element so canvas scales correctly in Safari iOS
 function applyMobileScale() {
-  const content = document.getElementById('content');
-  const scale   = Math.min(1, (window.innerWidth - 8) / 892);
-  content.style.zoom = scale;
+  const s = Math.min(1, (window.innerWidth - 8) / 892);
+  if (s >= 1) return;
+  // Scale canvas display size (internal resolution/drawing coords unchanged)
+  canvas.style.width  = Math.floor(W * s) + 'px';
+  canvas.style.height = Math.floor(H * s) + 'px';
+  // Scale bezel padding and border-radius
+  const bezel = document.getElementById('crt-bezel');
+  bezel.style.padding      = `${Math.round(30*s)}px ${Math.round(36*s)}px ${Math.round(40*s)}px ${Math.round(36*s)}px`;
+  bezel.style.borderRadius = `${Math.round(60*s)}px`;
+  // Scale title font
+  document.getElementById('title').style.fontSize = (3 * s) + 'rem';
+  // Scale ticker width
+  document.getElementById('ticker').style.width = Math.floor(892 * s) + 'px';
 }
 applyMobileScale();
 window.addEventListener('resize', applyMobileScale);
