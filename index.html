@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Spam Wars</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Press+Start+2P&display=swap" rel="stylesheet">
@@ -19,7 +20,9 @@
     overflow: hidden;
     gap: 10px;
     animation: bodyThud 0.35s ease-out 0.05s both;
+    touch-action: manipulation;
   }
+  canvas { touch-action: none; }
   @keyframes bodyThud {
     0%   { transform: translateY(0); }
     30%  { transform: translateY(-4px); }
@@ -1485,7 +1488,7 @@ function drawPlayers() {
 
   function side(px, player, flash, tps) {
     const col = player === 1 ? P1C() : P2C();
-    const key = player === 1 ? 'A' : 'L';
+    const key = isMobile ? 'TAP' : (player === 1 ? 'A' : 'L');
     const fa  = flash / 0.18;
 
     // Key square — pixel/retro style
@@ -2021,6 +2024,61 @@ function draw() {
   paintBg();
   window.addEventListener('resize', paintBg);
 })();
+
+// ── Mobile scaling ────────────────────────────────────────────────────────────
+(function applyMobileScale() {
+  const bezel  = document.getElementById('crt-bezel');
+  const ticker = document.getElementById('ticker');
+  const scale  = Math.min(1, (window.innerWidth - 8) / 892);
+  if (scale < 1) {
+    bezel.style.transformOrigin  = 'top center';
+    bezel.style.transform        = `scale(${scale})`;
+    bezel.style.marginBottom     = `${(scale - 1) * bezel.offsetHeight}px`;
+    ticker.style.transformOrigin = 'top center';
+    ticker.style.transform       = `scale(${scale})`;
+    ticker.style.marginTop       = `${(scale - 1) * ticker.offsetHeight}px`;
+  }
+})();
+window.addEventListener('resize', () => {
+  const bezel  = document.getElementById('crt-bezel');
+  const ticker = document.getElementById('ticker');
+  const scale  = Math.min(1, (window.innerWidth - 8) / 892);
+  if (scale < 1) {
+    bezel.style.transform    = `scale(${scale})`;
+    bezel.style.marginBottom = `${(scale - 1) * bezel.offsetHeight}px`;
+    ticker.style.transform   = `scale(${scale})`;
+    ticker.style.marginTop   = `${(scale - 1) * ticker.offsetHeight}px`;
+  } else {
+    bezel.style.transform    = '';
+    bezel.style.marginBottom = '';
+    ticker.style.transform   = '';
+    ticker.style.marginTop   = '';
+  }
+});
+
+// ── Touch input (mobile) ──────────────────────────────────────────────────────
+const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+_canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const touch of e.changedTouches) {
+    const { mx } = canvasCoords(touch);
+    if (state.phase === 'playing') {
+      if (mx < W / 2) onTap(1); else onTap(2);
+    } else if (state.phase === 'lobby') {
+      startCountdown();
+    } else if (state.phase === 'charSelect') {
+      if (mx < W / 2) state.p1Cursor = (state.p1Cursor + 1) % 16;
+      else             state.p2Cursor = (state.p2Cursor + 1) % 16;
+    } else if (state.phase === 'gameOver') {
+      const i1 = state.p1Icon, i2 = state.p2Icon;
+      initState();
+      state.p1Icon = i1; state.p2Icon = i2;
+      state.p1Cursor = i1; state.p2Cursor = i2;
+      state.phase = 'lobby';
+    }
+  }
+}, { passive: false });
 
 requestAnimationFrame(loop);
 </script>
