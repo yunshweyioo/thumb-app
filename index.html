@@ -2,14 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Spam War</title>
+<title>Spam Wars</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: #07070f;
+    background: linear-gradient(180deg, #1e1068 0%, #100840 44%, #04011a 50%, #100840 56%, #1e1068 100%);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -30,57 +30,48 @@
 
   /* ── Title ── */
   #title {
-    font-family: 'Bangers', Impact, cursive;
-    font-size: 5.2rem;
-    letter-spacing: 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 3rem;
+    letter-spacing: 3px;
     line-height: 1;
+    animation: titleFill 1.1s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
-  #title .p1 {
-    display: inline-block;
-    color: #ffffff;
-    text-shadow: 0 0 30px rgba(190,120,255,0.5), 0 3px 0 #0a0015;
-    animation:
-      wordSlam 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both,
-      wordBob  3s    ease-in-out 0.7s infinite;
-  }
+  #title .p1,
   #title .p2 {
     display: inline-block;
-    color: #ffffff;
-    text-shadow: 0 0 30px rgba(190,120,255,0.5), 0 3px 0 #0a0015;
-    animation:
-      wordSlam 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) 0.13s both,
-      wordBob  3s    ease-in-out 0.83s infinite;
+    background: linear-gradient(180deg,
+      #ffe600  0%,
+      #ff9900 22%,
+      #ff3300 58%,
+      #aa0a00 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter:
+      drop-shadow(6px 6px 0 #3363e8)
+      drop-shadow(12px 12px 0 rgba(0,0,0,0.5));
   }
+  #title .p1 { animation: titleFill 1.1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  #title .p2 { animation: titleFill 1.1s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-  @keyframes wordSlam {
-    0% {
-      transform: translateY(-110px) scale(1.7) rotate(-3deg);
-      opacity: 0;
-      filter: blur(8px);
-    }
-    55% {
-      transform: translateY(10px) scale(0.91) rotate(0.5deg);
-      opacity: 1;
-      filter: blur(0);
-    }
-    75% { transform: translateY(-5px) scale(1.04) rotate(-0.3deg); }
-    90% { transform: translateY(2px)  scale(0.99); }
-    100%{ transform: translateY(0)    scale(1)    rotate(0); }
-  }
-  @keyframes wordBob {
-    0%,100% { transform: translateY(0)   rotate(-0.4deg); }
-    50%     { transform: translateY(-5px) rotate(0.4deg); }
+  @keyframes titleFill {
+    0%   { transform: scale(7);    opacity: 0;   filter: blur(16px); }
+    18%  { opacity: 1;             filter: blur(6px); }
+    55%  { transform: scale(0.95); filter: blur(0); }
+    72%  { transform: scale(1.03); }
+    88%  { transform: scale(0.99); }
+    100% { transform: scale(1); }
   }
 
   /* ── Tagline ── */
   #tagline {
-    font-family: 'Fredoka', 'Segoe UI', sans-serif;
-    font-size: 0.9rem;
-    font-weight: 500;
-    letter-spacing: 3px;
-    color: rgba(255,255,255,0.28);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.45rem;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.3);
     text-transform: uppercase;
-    margin-top: -4px;
+    margin-top: 2px;
     animation: taglineFade 0.5s ease-out 0.65s both;
   }
   @keyframes taglineFade {
@@ -89,6 +80,13 @@
   }
 
   /* ── Impact flash ── */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+  }
   #slam-flash {
     position: fixed;
     inset: 0;
@@ -103,15 +101,149 @@
     100% { opacity: 0; }
   }
 
-  canvas { display: block; border-radius: 16px; }
+  /* ── CRT arcade bezel ── */
+  #crt-bezel {
+    position: relative;
+    padding: 30px 36px 40px 36px;
+    border-radius: 60px;
+    /* Chunky dark-plastic body */
+    background: linear-gradient(150deg,
+      #46435e 0%,
+      #2e2b46 15%,
+      #1c1a2e 40%,
+      #141220 60%,
+      #1e1c32 80%,
+      #302e4a 100%
+    );
+    /* 3-D bevel — wide bright top-left edge, deep dark bottom-right */
+    box-shadow:
+      inset  0   0   0  1px #5a567c,
+      inset  6px  6px  0 #524f72,
+      inset 14px 14px  0 #3a3858,
+      inset -6px -6px  0 #06050f,
+      inset -14px -14px 0 #0c0a1a,
+      /* screen-recess rim — subtle inner dark ring */
+      inset 0 0 0 28px rgba(0,0,0,0.35),
+      /* outer base shadow for depth */
+      0 10px 0 #07060f,
+      0 14px 0 #050410,
+      0 20px 60px rgba(0,0,0,0.98),
+      0  4px 80px rgba(60,30,160,0.4);
+    animation: canvasFadeIn 0.5s ease-out 0.3s both;
+  }
+
+  /* Corner screws */
+  #crt-bezel::before,
+  #crt-bezel::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 36%, #6a6890, #2a2840 55%, #111);
+    box-shadow: inset 1px 1px 2px rgba(255,255,255,0.18), 0 1px 3px #000;
+  }
+  #crt-bezel::before { top: 18px; left: 22px; }
+  #crt-bezel::after  { bottom: 22px; right: 26px; }
+
+  #game-wrap {
+    position: relative;
+    border-radius: 24px;
+    overflow: hidden;
+    box-shadow:
+      /* Deep inset recess — screen sits behind the bezel rim */
+      inset 0  0 100px rgba(0,0,0,0.7),
+      inset 0  0   3px rgba(255,255,255,0.06),
+      0 0 0 4px #02020a,
+      0 0 0 6px #1a1830;
+  }
+  canvas {
+    display: block;
+    border-radius: 24px;
+  }
+  #scanlines {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.09) 2px,
+      rgba(0,0,0,0.09) 4px
+    );
+    pointer-events: none;
+    border-radius: 24px;
+  }
+  /* Convex glass specular highlight */
+  #crt-gloss {
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    background: radial-gradient(
+      ellipse 60% 40% at 35% 25%,
+      rgba(255,255,255,0.07) 0%,
+      transparent 55%
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+  @keyframes canvasFadeIn {
+    from { opacity: 0; transform: scale(0.97); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+
+  /* Extra corner screws */
+  .crt-screw {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 36%, #6a6890, #2a2840 55%, #111);
+    box-shadow: inset 1px 1px 2px rgba(255,255,255,0.18), 0 1px 3px #000;
+    z-index: 2;
+  }
+  .crt-screw::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 15%;
+    width: 70%; height: 2px;
+    background: rgba(0,0,0,0.45);
+    transform: translateY(-50%) rotate(45deg);
+    border-radius: 1px;
+  }
+
+  /* Scrolling ticker */
+  #ticker {
+    width: 892px; /* canvas 820 + bezel padding 36*2 */
+    overflow: hidden;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 0.42rem;
+    color: rgba(255,238,0,0.55);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    margin-top: 6px;
+  }
+  #ticker span {
+    display: inline-block;
+    animation: tickerScroll 22s linear infinite;
+  }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-100%); }
+  }
 </style>
 </head>
 <body>
-
+<canvas id="bg-canvas"></canvas>
 <div id="slam-flash"></div>
-<div id="title"><span class="p1">SPAM</span> <span class="p2">WAR</span></div>
+<div id="title"><span class="p1">SPAM</span> <span class="p2">WARS</span></div>
 <div id="tagline">tap faster &nbsp;·&nbsp; win harder</div>
-<canvas id="c"></canvas>
+<div id="crt-bezel">
+  <div class="crt-screw" style="top:18px;right:26px"></div>
+  <div class="crt-screw" style="bottom:22px;left:22px"></div>
+  <div id="game-wrap"><canvas id="c"></canvas><div id="scanlines"></div><div id="crt-gloss"></div></div>
+</div>
+<div id="ticker"><span>· SPAM WARS · TAP FASTER · WIN HARDER · BEST OF 3 · INSERT COIN · SPAM WARS · TAP FASTER · WIN HARDER · BEST OF 3 · INSERT COIN ·&nbsp;&nbsp;&nbsp;&nbsp;</span><span>· SPAM WARS · TAP FASTER · WIN HARDER · BEST OF 3 · INSERT COIN · SPAM WARS · TAP FASTER · WIN HARDER · BEST OF 3 · INSERT COIN ·&nbsp;&nbsp;&nbsp;&nbsp;</span></div>
 
 <script>
 const canvas = document.getElementById('c');
@@ -127,8 +259,8 @@ canvas.style.height = H + 'px';
 ctx.scale(DPR, DPR);
 
 // ── Colors ────────────────────────────────────────────────────────────────────
-const P1C = '#5ba8e8';
-const P2C = '#e85b5b';
+function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
+function P2C() { return ALIENS[state ? state.p2Icon : 8].c; }
 
 // ── Bar geometry ──────────────────────────────────────────────────────────────
 const BAR_Y    = 248;
@@ -136,6 +268,22 @@ const BAR_CX   = W / 2;
 const BAR_HALF = 180;
 const BAR_H    = 30;
 const ORB_R    = 19;
+
+// ── Lobby button — sits where the round timer lives ───────────────────────────
+const TIMER_CY  = BAR_Y - 72;  // 176
+const LOBBY_BTN = { x: W/2 - 100, y: TIMER_CY - 22, w: 200, h: 44 };
+
+// Pre-generated star positions for background
+const BG_STARS = Array.from({length: 35}, (_, i) => {
+  const rng = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+  const x   = (rng - Math.floor(rng)) * W;
+  const rng2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
+  const y   = (rng2 - Math.floor(rng2)) * H;
+  const rng3 = Math.sin(i * 419.2 + 77.1) * 43758.5453;
+  const s   = (rng3 - Math.floor(rng3)) < 0.3 ? 2 : 1;
+  return [Math.round(x), Math.round(y), s];
+});
+let lobbyHover  = false;
 
 // ── Game tuning ───────────────────────────────────────────────────────────────
 const TAP_STEP   = 0.068;
@@ -260,17 +408,17 @@ function stopPinTone() {
 // ── Particles ─────────────────────────────────────────────────────────────────
 const particles = [];
 function burst(player, orbX, big) {
-  const color = player === 1 ? P1C : P2C;
-  const count = big ? 28 : 9;
+  const color = player === 1 ? P1C() : P2C();
+  const count = big ? 32 : 12;
   for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.6;
-    const spd   = big ? (80 + Math.random() * 220) : (50 + Math.random() * 130);
+    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.7;
+    const spd   = big ? (90 + Math.random() * 240) : (55 + Math.random() * 140);
     particles.push({
       x: orbX, y: BAR_Y,
-      vx: Math.cos(angle) * spd * (player === 1 ? 0.7 : -0.7) + (Math.random()-0.5)*80,
+      vx: Math.cos(angle) * spd * (player === 1 ? 0.7 : -0.7) + (Math.random()-0.5)*90,
       vy: Math.sin(angle) * spd,
-      r: big ? (4 + Math.random() * 7) : (2 + Math.random() * 4),
-      life: 1.0, decay: big ? 1.6 : 2.4, color,
+      r: big ? (5 + Math.random() * 8) : (3 + Math.random() * 5),
+      life: 1.0, decay: big ? 1.5 : 2.2, color,
     });
   }
 }
@@ -285,13 +433,12 @@ function tickParticles(dt) {
 }
 function drawParticles() {
   for (const p of particles) {
+    const sz = Math.ceil(p.r * Math.max(0.1, p.life));
     ctx.save();
-    ctx.globalAlpha = Math.max(0, p.life) * 0.85;
-    ctx.shadowColor = p.color; ctx.shadowBlur = 6;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.r * Math.max(0.1, p.life), 0, Math.PI * 2);
+    ctx.globalAlpha = Math.max(0, p.life) * 0.9;
+    ctx.shadowColor = p.color; ctx.shadowBlur = 8;
     ctx.fillStyle = p.color;
-    ctx.fill();
+    ctx.fillRect(Math.round(p.x - sz/2), Math.round(p.y - sz/2), sz, sz);
     ctx.restore();
   }
 }
@@ -313,20 +460,50 @@ function tickFlash(dt) { flashAlpha = Math.max(0, flashAlpha - dt * 4); }
 
 // ── Orb bounce ────────────────────────────────────────────────────────────────
 let orbBounce = 0;
+let orbVelX   = 0;   // -1..1, direction+magnitude of recent tap
+let coinAngle  = 0;
+let orbitAngle = 0;   // for orbiting dots
 function triggerOrbBounce() { orbBounce = 1; }
-function tickOrb(dt) { orbBounce = Math.max(0, orbBounce - dt * 8); }
+function tickOrb(dt) {
+  orbBounce  = Math.max(0, orbBounce - dt * 9);
+  orbVelX   *= Math.max(0, 1 - dt * 6);
+  coinAngle  += orbVelX * dt * 18;
+  // Orbit dots spin at base speed + boost from current velocity
+  orbitAngle += dt * (2.5 + Math.abs(orbVelX) * 8);
+}
 
 // ── Orb trail ─────────────────────────────────────────────────────────────────
 const orbTrail = [];
 function pushTrail(x) {
   orbTrail.push({ x, age: 0 });
-  if (orbTrail.length > 18) orbTrail.shift();
+  if (orbTrail.length > 28) orbTrail.shift();
 }
 function tickTrail(dt) { orbTrail.forEach(t => t.age += dt); }
 
 // ── Tap history (TPS) ─────────────────────────────────────────────────────────
-const tapHistory = [[], []];
-function recordTap(player) { tapHistory[player-1].push(performance.now()); }
+const tapHistory  = [[], []];
+const lastTapTime = [0, 0];     // ms timestamp of previous tap
+const lastTapGap  = [0, 0];     // interval of previous tap pair
+const rhythmBonus = [0, 0];     // 0..1 — how consistent the rhythm is
+
+function recordTap(player) {
+  const now = performance.now();
+  const idx = player - 1;
+  const gap = now - lastTapTime[idx];
+  if (lastTapTime[idx] > 0 && gap < 600) {
+    // How similar is this gap to the last gap? (1 = identical, 0 = very different)
+    const consistency = lastTapGap[idx] > 0
+      ? Math.max(0, 1 - Math.abs(gap - lastTapGap[idx]) / lastTapGap[idx])
+      : 0;
+    rhythmBonus[idx] = Math.min(1, rhythmBonus[idx] * 0.6 + consistency * 0.5);
+  } else {
+    rhythmBonus[idx] *= 0.4; // gap too long, decay bonus
+  }
+  lastTapGap[idx]  = gap;
+  lastTapTime[idx] = now;
+  tapHistory[idx].push(now);
+}
+
 function getTPS(player) {
   const now = performance.now();
   tapHistory[player-1] = tapHistory[player-1].filter(t => now - t < 1000);
@@ -362,47 +539,157 @@ const SEG_H      = (METER_H - (METER_SEGS - 1) * METER_GAP) / METER_SEGS;
 function drawMeter(player) {
   const isP1 = player === 1;
   const mx   = isP1 ? 26 : W - 26;
-  const col  = isP1 ? P1C : P2C;
+  const col  = isP1 ? P1C() : P2C();
   const lv   = meterLevel[player - 1];
-  const pk   = meterPeak[player - 1];
   const topY = BAR_Y - METER_H / 2;
+  const PAD  = 4; // casing padding
 
-  for (let i = 0; i < METER_SEGS; i++) {
-    const frac = (i + 1) / METER_SEGS;          // 0..1 bottom→top
-    const sy   = topY + METER_H - (i + 1) * SEG_H - i * METER_GAP;
-    const on   = frac <= lv;
-    // Colour ramp: green → yellow → red (same for both players)
-    const segCol = on
-      ? (frac > 0.75 ? '#ff3c3c' : frac > 0.45 ? '#ffc400' : '#3ddc84')
-      : null;
-    const dimCol = frac > 0.75 ? '#ff3c3c' : frac > 0.45 ? '#ffc400' : '#3ddc84';
-
-    ctx.save();
-    if (on) { ctx.shadowColor = segCol; ctx.shadowBlur = frac > 0.75 ? 10 : 5; }
-    ctx.beginPath(); ctx.roundRect(mx - METER_W/2, sy, METER_W, SEG_H, 2);
-    ctx.fillStyle = on ? segCol : hexAlpha(dimCol, 0.09);
-    ctx.fill();
-    if (!on) { ctx.strokeStyle = hexAlpha(dimCol, 0.18); ctx.lineWidth = 1; ctx.stroke(); }
-    ctx.restore();
+  // Segment colour ramp: green → yellow-green → yellow → orange → red
+  function segColor(frac) {
+    if (frac <= 0.20) return '#22dd22';
+    if (frac <= 0.40) return '#88dd00';
+    if (frac <= 0.58) return '#ddcc00';
+    if (frac <= 0.75) return '#ffaa00';
+    if (frac <= 0.88) return '#ff5500';
+    return '#ff1100';
   }
 
-  // Peak tick
-  if (pk > 0.04) {
-    const peakFrac = pk;
-    const psy = topY + METER_H - peakFrac * (METER_H) - 1;
+  // Outer casing
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(mx - METER_W/2 - PAD, topY - PAD, METER_W + PAD*2, METER_H + PAD*2, 4);
+  ctx.fillStyle = '#0d0d18';
+  ctx.fill();
+  ctx.strokeStyle = '#555566';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // Segments
+  for (let i = 0; i < METER_SEGS; i++) {
+    const frac = (i + 1) / METER_SEGS;
+    const sy   = topY + METER_H - (i + 1) * SEG_H - i * METER_GAP;
+    const on   = frac <= lv;
+    const sc   = segColor(frac);
+
     ctx.save();
-    const pkCol = peakFrac > 0.75 ? '#ff3c3c' : peakFrac > 0.45 ? '#ffc400' : '#3ddc84';
-    ctx.shadowColor = pkCol; ctx.shadowBlur = 8;
-    ctx.fillStyle   = '#fff';
-    ctx.beginPath(); ctx.roundRect(mx - METER_W/2, psy, METER_W, 3, 1); ctx.fill();
+    if (on) { ctx.shadowColor = sc; ctx.shadowBlur = 8; }
+    ctx.beginPath(); ctx.rect(mx - METER_W/2, sy, METER_W, SEG_H);
+    ctx.fillStyle = on ? sc : hexAlpha(sc, 0.1);
+    ctx.fill();
+    if (!on) { ctx.strokeStyle = hexAlpha(sc, 0.2); ctx.lineWidth = 1; ctx.stroke(); }
     ctx.restore();
   }
 
   // Label
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = '600 10px Fredoka, Segoe UI';
-  ctx.fillStyle = hexAlpha(col, 0.45);
-  txt('PWR', mx, topY - 11);
+  ctx.save();
+  ctx.font = '6px "Press Start 2P", monospace';
+  ctx.shadowColor = col; ctx.shadowBlur = 8;
+  ctx.fillStyle = col;
+  glowTxt('PWR', mx, topY - 10);
+  ctx.restore();
+}
+
+// ── Pixel-art alien sprites ────────────────────────────────────────────────
+// 0=empty  1=body  2=eye accent
+const SHAPES = [
+  // 0: Classic wide crab (11×8)
+  [[0,0,1,0,0,0,0,0,1,0,0],
+   [0,0,0,1,0,0,0,1,0,0,0],
+   [0,0,1,1,1,1,1,1,1,0,0],
+   [0,1,1,2,1,1,1,2,1,1,0],
+   [1,1,1,1,1,1,1,1,1,1,1],
+   [1,0,1,1,1,1,1,1,1,0,1],
+   [1,0,1,0,0,0,0,0,1,0,1],
+   [0,0,0,1,1,0,1,1,0,0,0]],
+  // 1: Tall insect (9×8)
+  [[0,0,0,1,0,1,0,0,0],
+   [0,0,1,1,1,1,1,0,0],
+   [0,1,1,1,1,1,1,1,0],
+   [1,1,2,1,1,1,2,1,1],
+   [1,1,1,1,1,1,1,1,1],
+   [0,0,1,1,1,1,1,0,0],
+   [0,0,1,0,0,0,1,0,0],
+   [0,1,0,0,0,0,0,1,0]],
+  // 2: Round blob/ghost (9×8)
+  [[0,0,0,1,1,1,0,0,0],
+   [0,0,1,1,1,1,1,0,0],
+   [0,1,2,1,1,1,2,1,0],
+   [1,1,1,1,1,1,1,1,1],
+   [1,1,1,1,1,1,1,1,1],
+   [0,1,1,1,1,1,1,1,0],
+   [0,0,1,0,0,0,1,0,0],
+   [0,1,0,0,0,0,0,1,0]],
+  // 3: Spider with legs (9×8)
+  [[1,0,0,0,1,0,0,0,1],
+   [0,1,0,1,1,1,0,1,0],
+   [0,0,1,2,1,2,1,0,0],
+   [0,1,1,1,1,1,1,1,0],
+   [1,1,1,1,1,1,1,1,1],
+   [0,1,1,0,1,0,1,1,0],
+   [0,0,0,1,0,1,0,0,0],
+   [0,0,1,0,0,0,1,0,0]],
+];
+
+const ALIENS = [
+  {s:0,c:'#8833cc',e:'#ff5555'}, // 0  purple crab
+  {s:1,c:'#aacc33',e:'#ffee00'}, // 1  yellow-green insect
+  {s:2,c:'#ff44aa',e:'#ffff44'}, // 2  pink blob
+  {s:3,c:'#ffaa00',e:'#8833cc'}, // 3  orange spider
+  {s:0,c:'#33ccbb',e:'#8833cc'}, // 4  teal crab
+  {s:1,c:'#cc33cc',e:'#ffee00'}, // 5  magenta insect
+  {s:2,c:'#ffee00',e:'#aa33cc'}, // 6  yellow blob
+  {s:3,c:'#ff5500',e:'#ffff44'}, // 7  orange-red spider
+  {s:0,c:'#ff2266',e:'#ffff44'}, // 8  hot-pink crab
+  {s:1,c:'#66cc22',e:'#cc44cc'}, // 9  green insect
+  {s:2,c:'#4466ee',e:'#ffaa00'}, // 10 blue blob
+  {s:3,c:'#44cccc',e:'#884499'}, // 11 teal spider
+  {s:0,c:'#6644bb',e:'#ff4444'}, // 12 blue-purple crab
+  {s:1,c:'#ee4411',e:'#ffee00'}, // 13 orange-red insect
+  {s:2,c:'#ccee22',e:'#884499'}, // 14 yellow-green blob
+  {s:3,c:'#44aa44',e:'#ffee00'}, // 15 green spider
+];
+
+// ── Per-alien select animation ─────────────────────────────────────────────────
+// Returns {dx, dy, sx, sy, rot} canvas transforms for the selected sprite
+function alienAnim(i, t) {
+  const s = Math.sin, c = Math.cos, abs = Math.abs;
+  switch (i) {
+    case  0: return { dx: s(t*4)*6,            dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: scuttle L/R
+    case  1: return { dx: 0,                   dy: -abs(s(t*5))*9,      sx: 1,                    sy: 1,           rot: 0             }; // insect: hop
+    case  2: { const p=0.82+0.18*s(t*3);       return {dx:0,dy:0,       sx:p,                     sy:p,            rot:0             }; } // blob: pulse
+    case  3: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: t * 2.0       }; // spider: spin
+    case  4: return { dx: s(t*6)*5,            dy: s(t*12)*2,           sx: 1,                    sy: 1,           rot: s(t*6)*0.12   }; // crab: scuttle+tilt
+    case  5: return { dx: s(t*9)*3,            dy: -abs(s(t*9))*7,      sx: 1,                    sy: 1,           rot: 0             }; // insect: flutter
+    case  6: { const q=1+0.22*s(t*4);          return {dx:0,dy:5*(q-1), sx:q,                     sy:2-q,          rot:0             }; } // blob: squash & stretch
+    case  7: return { dx: s(t*22)*3,           dy: c(t*19)*3,           sx: 1,                    sy: 1,           rot: 0             }; // spider: vibrate
+    case  8: return { dx: s(t*3)*7,            dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*3)*0.18   }; // crab: wave
+    case  9: { const j=(t*3.5)%(Math.PI*2);    return {dx:0,           dy:-abs(s(j))*11,          sx:1,            sy:1,            rot:0}; } // insect: jump
+    case 10: { const p=0.88+0.12*s(t*2.5);     return {dx:0,dy:s(t*2.5)*4, sx:p,                 sy:p,            rot:0             }; } // blob: float+breathe
+    case 11: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*1.4)*0.45 }; // spider: sway
+    case 12: return { dx: s(t*11)*8,           dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: dash
+    case 13: { const z=1+0.2*s(t*3.5);         return {dx:0,dy:0,       sx:z,                     sy:z,            rot:0             }; } // insect: zoom
+    case 14: return { dx: s(t*5)*5,            dy: c(t*5)*4,            sx: 1,                    sy: 1,           rot: s(t*5)*0.22   }; // blob: orbit wiggle
+    case 15: return { dx: 0,                   dy: s(t*2)*6,            sx: 1,                    sy: 1,           rot: 0             }; // spider: float
+    default: return { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0 };
+  }
+}
+
+function drawAlienSprite(idx, cx, cy, ps) {
+  const a = ALIENS[idx];
+  const grid = SHAPES[a.s];
+  const cols = grid[0].length, rows = grid.length;
+  const ox = cx - (cols * ps) / 2;
+  const oy = cy - (rows * ps) / 2;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const v = grid[r][c];
+      if (!v) continue;
+      ctx.fillStyle = v === 2 ? a.e : a.c;
+      ctx.fillRect(Math.round(ox + c * ps), Math.round(oy + r * ps), ps, ps);
+    }
+  }
 }
 
 // ── Score pop ─────────────────────────────────────────────────────────────────
@@ -413,58 +700,331 @@ function tickScorePop(dt) {
   scoreScale[1] = Math.max(1, scoreScale[1] - dt * 5);
 }
 
+// ── Boot sequence ─────────────────────────────────────────────────────────────
+const BOOT_LINES = [
+  'SPAMCO SYSTEMS v1.0',
+  '',
+  '> MEMORY CHECK..... OK',
+  '> AUDIO............ OK',
+  '> VIDEO............ OK',
+  '',
+  '> LOADING SPAM WARS...',
+  '',
+];
+let bootLineShown = 0, bootLineTimer = 0, bootDoneTimer = 0;
+const BOOT_LINE_DELAY = 0.18;
+
+// ── Combo floating texts ───────────────────────────────────────────────────────
+const comboTexts = [];
+const lastComboShow = [0, 0];
+function addComboText(text, x, y, col) {
+  comboTexts.push({ text, x, y, vy: -55, alpha: 1.0, col });
+}
+function tickComboTexts(dt) {
+  for (let i = comboTexts.length - 1; i >= 0; i--) {
+    const c = comboTexts[i];
+    c.y += c.vy * dt; c.alpha -= dt * 1.8;
+    if (c.alpha <= 0) comboTexts.splice(i, 1);
+  }
+}
+function drawComboTexts() {
+  for (const c of comboTexts) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, c.alpha);
+    ctx.font = '9px "Press Start 2P", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.shadowColor = c.col; ctx.shadowBlur = 14;
+    ctx.fillStyle = '#fff';
+    ctx.fillText(c.text, c.x, c.y);
+    ctx.restore();
+  }
+}
+
+// ── Power-up pickup texts (zoom-out + fade, different from combo float-up) ────
+const puTexts = [];
+function addPuText(text, x, y, col) {
+  puTexts.push({ text, x, y, col, alpha: 1.0, scale: 0.4, age: 0 });
+}
+function tickPuTexts(dt) {
+  for (let i = puTexts.length - 1; i >= 0; i--) {
+    const p = puTexts[i];
+    p.age   += dt;
+    p.scale  = Math.min(1.4, p.scale + dt * 4.5); // zoom from small → overshoot
+    p.alpha -= dt * 1.4;
+    if (p.alpha <= 0) puTexts.splice(i, 1);
+  }
+}
+function drawPuTexts() {
+  for (const p of puTexts) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, p.alpha);
+    ctx.translate(p.x, p.y);
+    ctx.scale(p.scale, p.scale);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '11px "Press Start 2P", monospace';
+    ctx.shadowColor = p.col; ctx.shadowBlur = 20;
+    ctx.fillStyle = p.col;
+    ctx.fillText(p.text, 0, 0);
+    ctx.restore();
+  }
+}
+
+// ── Power-ups ─────────────────────────────────────────────────────────────────
+const PU_TYPES = [
+  { id: 'speed',  label: 'SPD', col: '#ffee00', desc: 'SPEED UP!',   dur: 4.0 },
+  { id: 'shield', label: 'SHD', col: '#44aaff', desc: 'SHIELD!',     dur: 3.5 },
+  { id: 'freeze', label: 'FRZ', col: '#88ffee', desc: 'FREEZE!',     dur: 2.5 },
+];
+let powerUp = null;   // { pos: -1..1, typeIdx, age }
+let puSpawnTimer = 7;
+const puEffects = [{ id: null, timer: 0 }, { id: null, timer: 0 }];
+
+function spawnPowerUp() {
+  const sign = Math.random() > 0.5 ? 1 : -1;
+  const pos  = sign * (0.15 + Math.random() * 0.55);
+  powerUp = { pos, typeIdx: Math.floor(Math.random() * PU_TYPES.length), age: 0 };
+}
+function collectPowerUp(player) {
+  if (!powerUp) return;
+  const pu  = PU_TYPES[powerUp.typeIdx];
+  const idx = player - 1;
+  puEffects[idx] = { id: pu.id, timer: pu.dur };
+  const col = player === 1 ? P1C() : P2C();
+  const px  = BAR_CX + powerUp.pos * BAR_HALF;
+  addPuText(pu.desc, px, BAR_Y - 28, pu.col);
+  addFlash(pu.col, 0.28);
+  powerUp = null;
+  puSpawnTimer = 5 + Math.random() * 4;
+}
+function tickPowerUp(dt) {
+  puSpawnTimer -= dt;
+  if (!powerUp && puSpawnTimer <= 0) { spawnPowerUp(); puSpawnTimer = 5 + Math.random() * 4; }
+  if (powerUp) {
+    powerUp.age += dt;
+    if (Math.abs(state.balance - powerUp.pos) < 0.055) {
+      collectPowerUp(powerUp.pos > 0 ? 1 : 2);
+    }
+  }
+  for (const e of puEffects) { if (e.timer > 0) e.timer -= dt; }
+}
+function drawPowerUp() {
+  if (!powerUp) return;
+  const pu  = PU_TYPES[powerUp.typeIdx];
+  const t   = performance.now() * 0.001;
+  const px  = BAR_CX + powerUp.pos * BAR_HALF;
+  const bob = Math.sin(t * 4.5) * 4;
+  const pulse = 0.65 + 0.35 * Math.sin(t * 5.5);
+
+  ctx.save();
+  ctx.shadowColor = pu.col; ctx.shadowBlur = 18 * pulse;
+  ctx.beginPath();
+  ctx.moveTo(px,      BAR_Y - 13 + bob);
+  ctx.lineTo(px + 9,  BAR_Y      + bob);
+  ctx.lineTo(px,      BAR_Y + 13 + bob);
+  ctx.lineTo(px - 9,  BAR_Y      + bob);
+  ctx.closePath();
+  ctx.fillStyle = hexAlpha(pu.col, 0.82 * pulse);
+  ctx.fill();
+  ctx.strokeStyle = pu.col; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.font = '5px "Press Start 2P", monospace';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#000';
+  ctx.fillText(pu.label, px, BAR_Y + bob);
+  ctx.restore();
+}
+
+// ── High score (wins per player) ──────────────────────────────────────────────
+function getWins(p) { try { return parseInt(localStorage.getItem(`spamwars_wins_p${p}`) || '0'); } catch { return 0; } }
+function addWin(p)  { try { localStorage.setItem(`spamwars_wins_p${p}`, getWins(p) + 1); }          catch {} }
+
+// ── Lobby idle tracking ────────────────────────────────────────────────────────
+let lobbyEnteredTime = 0;
+let prevPhase = null;
+
+// ── Active effect HUD helper ───────────────────────────────────────────────────
+function drawEffectHud() {
+  [0, 1].forEach(idx => {
+    const e = puEffects[idx];
+    if (!e.id || e.timer <= 0) return;
+    const pu  = PU_TYPES.find(p => p.id === e.id);
+    const px  = idx === 0 ? 140 : W - 140;
+    const py  = BAR_Y + 76;
+    const frac = e.timer / pu.dur;
+    ctx.save();
+    ctx.shadowColor = pu.col; ctx.shadowBlur = 10 * frac;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = pu.col;
+    ctx.fillText(pu.label, px, py);
+    // tiny timer bar
+    const bw = 40, bh = 4;
+    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw, bh);
+    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw * frac, bh);
+    ctx.fillStyle = pu.col; ctx.fill();
+    ctx.restore();
+  });
+}
+
 // ── State ─────────────────────────────────────────────────────────────────────
 let state;
 function initState() {
   state = {
     balance: 0,
     scores: [0, 0], round: 1,
-    phase: 'countdown', countdown: 3, cdTimer: 1.0, cdScale: 1.6,
+    phase: 'boot', countdown: 3, cdTimer: 1.0, cdScale: 1.6,
     reTimer: 0, roundWinner: null,
     roundTimer: ROUND_TIME,
     tapFlash: [0, 0], tapCount: [0, 0],
+    p1Icon: 0, p2Icon: 8,
+    p1Cursor: 0, p2Cursor: 8,
   };
   particles.length = orbTrail.length = 0;
-  orbBounce = shakeAmt = flashAlpha = 0;
+  orbBounce = orbVelX = coinAngle = orbitAngle = shakeAmt = flashAlpha = 0;
   scoreScale = [1, 1];
   meterLevel[0] = meterLevel[1] = meterPeak[0] = meterPeak[1] = 0;
   meterPeakT[0] = meterPeakT[1] = 0;
   spIdx[0] = spIdx[1] = 0;
   tapHistory[0].length = tapHistory[1].length = 0;
+  lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
+  comboTexts.length = 0; puTexts.length = 0;
+  lastComboShow[0] = lastComboShow[1] = 0;
+  powerUp = null; puSpawnTimer = 7;
+  puEffects[0] = { id: null, timer: 0 };
+  puEffects[1] = { id: null, timer: 0 };
 }
 initState();
 
-// Shake the canvas in sync with each word slamming in
-setTimeout(() => addShake(0.9), 50);   // SPAM lands ~50ms in
-setTimeout(() => addShake(0.65), 180); // WAR lands ~130ms later
 
 // ── Input ─────────────────────────────────────────────────────────────────────
+function startCountdown() {
+  state.phase = 'countdown';
+  state.countdown = 3; state.cdTimer = 1.0; state.cdScale = 1.6;
+}
+
 document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
-  if (['a','l'].includes(k)) e.preventDefault();
-  if (k === 'r' && state.phase === 'gameOver') { initState(); return; }
+  if (['a','s','l','k',' '].includes(k)) e.preventDefault();
+  if (k === 'escape') {
+    e.preventDefault();
+    if (state.phase === 'charSelect') return; // ESC does nothing on char select
+    const i1 = state.p1Icon, i2 = state.p2Icon;
+    initState();
+    state.p1Icon = i1; state.p2Icon = i2;
+    state.p1Cursor = i1; state.p2Cursor = i2;
+    state.phase = 'lobby';
+    return;
+  }
+  if (k === 'r' && state.phase === 'gameOver') {
+    const i1 = state.p1Icon, i2 = state.p2Icon;
+    initState();
+    state.p1Icon = i1; state.p2Icon = i2;
+    state.p1Cursor = i1; state.p2Cursor = i2;
+    state.phase = 'lobby';
+    return;
+  }
+  if (state.phase === 'charSelect') {
+    if (k === 's') { state.p1Cursor = (state.p1Cursor + 1) % 16; return; }
+    if (k === 'a') { state.p1Cursor = (state.p1Cursor + 15) % 16; return; }
+    if (k === 'l') { state.p2Cursor = (state.p2Cursor + 1) % 16; return; }
+    if (k === 'k') { state.p2Cursor = (state.p2Cursor + 15) % 16; return; }
+    if (k === ' ') { state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby'; return; }
+    return;
+  }
+  if ((k === ' ') && state.phase === 'lobby') { startCountdown(); return; }
   if (state.phase !== 'playing') return;
   if (k === 'a') onTap(1);
   if (k === 'l') onTap(2);
 });
+
+const _canvas = document.getElementById('c');
+
+function canvasCoords(e) {
+  const r = _canvas.getBoundingClientRect();
+  return {
+    mx: (e.clientX - r.left) * (W / r.width),
+    my: (e.clientY - r.top)  * (H / r.height),
+  };
+}
+function inRect(mx, my, rect) {
+  return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
+}
+function goToCharSelect() {
+  state.p1Cursor = state.p1Icon;
+  state.p2Cursor = state.p2Icon;
+  state.phase = 'charSelect';
+}
+
+_canvas.addEventListener('click', e => {
+  const { mx, my } = canvasCoords(e);
+  if (state.phase !== 'charSelect' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
+  if (state.phase === 'lobby') startCountdown();
+});
+_canvas.addEventListener('mousemove', e => {
+  const { mx, my } = canvasCoords(e);
+  // Change players button (all non-charSelect phases)
+  changeHover = state.phase !== 'charSelect' && inRect(mx, my, CHANGE_BTN);
+  // Lobby press-start hover
+  lobbyHover = state.phase === 'lobby' && inRect(mx, my, LOBBY_BTN);
+  _canvas.style.cursor = (changeHover || lobbyHover) ? 'pointer' : 'default';
+});
+_canvas.addEventListener('mouseleave', () => {
+  lobbyHover = false;
+  changeHover = false;
+  _canvas.style.cursor = 'default';
+});
 function onTap(player) {
+  const idx = player - 1;
+  // Freeze effect: this player's taps do nothing
+  if (puEffects[idx].id === 'freeze' && puEffects[idx].timer > 0) return;
+
   const orbX = BAR_CX + state.balance * BAR_HALF;
-  if (player === 1) state.balance = Math.min( 1, state.balance + TAP_STEP);
-  else              state.balance = Math.max(-1, state.balance - TAP_STEP);
+  // Speed boost effect
+  const speedMult = (puEffects[idx].id === 'speed' && puEffects[idx].timer > 0) ? 1.6 : 1;
+  const step = TAP_STEP * (1 + rhythmBonus[idx] * 0.6) * speedMult;
+  if (player === 1) state.balance = Math.min( 1, state.balance + step);
+  else              state.balance = Math.max(-1, state.balance - step);
   state.tapFlash[player-1] = 0.18;
   state.tapCount[player-1]++;
   recordTap(player);
+  // Combo floating text
+  const now = performance.now();
+  if (rhythmBonus[idx] > 0.65 && now - lastComboShow[idx] > 700) {
+    const words = rhythmBonus[idx] > 0.9 ? 'PERFECT!' : rhythmBonus[idx] > 0.78 ? 'COMBO!' : 'NICE!';
+    const col   = player === 1 ? P1C() : P2C();
+    addComboText(words, orbX + (player === 1 ? 44 : -44), BAR_Y - 32, col);
+    lastComboShow[idx] = now;
+  }
   triggerOrbBounce();
+  orbVelX = Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7)));
   spikeMe(player);
   burst(player, orbX, false);
   sfxTap(player);
+  // Instant win if orb reaches the opponent's end
+  if (state.balance >= 1.0) { winRound(1); return; }
+  if (state.balance <= -1.0) { winRound(2); return; }
 }
 
 // ── Game logic ────────────────────────────────────────────────────────────────
 function tickGame(dt) {
-  // Always drift orb back to center
-  if      (state.balance > 0) state.balance = Math.max(0, state.balance - DRIFT_SPD * dt);
-  else if (state.balance < 0) state.balance = Math.min(0, state.balance + DRIFT_SPD * dt);
+  // Option E: tug zones — drift gets stronger past the 50% mark (comeback mechanic)
+  const absBal   = Math.abs(state.balance);
+  const tugBoost = absBal > 0.5 ? 1 + (absBal - 0.5) * 3.5 : 1;
+
+  // Idle boost — if both players have stopped tapping, ball snaps back faster
+  const now         = performance.now();
+  const sinceAnyTap = now - Math.max(lastTapTime[0], lastTapTime[1]);
+  const idleBoost   = sinceAnyTap > 250 ? 1 + Math.min(4, (sinceAnyTap - 250) / 200) : 1;
+
+  const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
+  const shieldP1 = puEffects[0].id === 'shield' && puEffects[0].timer > 0;
+  const shieldP2 = puEffects[1].id === 'shield' && puEffects[1].timer > 0;
+  if      (state.balance > 0 && !shieldP1) state.balance = Math.max(0, state.balance - drift);
+  else if (state.balance < 0 && !shieldP2) state.balance = Math.min(0, state.balance + drift);
+  tickPowerUp(dt);
+  tickComboTexts(dt);
+  tickPuTexts(dt);
 
   // Round countdown
   state.roundTimer -= dt;
@@ -475,8 +1035,7 @@ function tickGame(dt) {
     // Whoever's side the orb is on wins; tap count breaks ties
     if      (state.balance > 0.01)  winRound(1);
     else if (state.balance < -0.01) winRound(2);
-    else if (state.tapCount[0] >= state.tapCount[1]) winRound(1);
-    else    winRound(2);
+    else    drawRound();
     return;
   }
 
@@ -490,22 +1049,27 @@ function tickGame(dt) {
 }
 function winRound(player) {
   state.scores[player-1]++;
-  state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 2.8;
+  state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 3.2;
   const orbX = BAR_CX + state.balance * BAR_HALF;
   burst(player, orbX, true); burst(player, orbX, true);
-  addShake(1.2); addFlash(player === 1 ? P1C : P2C, 0.6);
+  addShake(1.2); addFlash(player === 1 ? P1C() : P2C(), 0.6);
   sfxWin(player); triggerScorePop(player);
+  if (state.scores[player-1] >= 2) addWin(player);
+}
+function drawRound() {
+  state.phase = 'roundEnd'; state.roundWinner = 0; state.reTimer = 2.8;
+  addShake(0.5); addFlash('#888', 0.25);
 }
 function nextRound() {
-  if (state.scores[0] >= 2 || state.scores[1] >= 2) {
+  if (state.scores[0] >= 2 || state.scores[1] >= 2 || state.round >= 3) {
     state.phase = 'gameOver';
   } else {
     state.round++; state.balance = 0; state.tapCount = [0,0];
     state.roundTimer = ROUND_TIME;
-    state.phase = 'countdown'; state.countdown = 3;
-    state.cdTimer = 1.0; state.cdScale = 1.6;
+    state.phase = 'lobby';
     particles.length = orbTrail.length = 0;
     tapHistory[0].length = tapHistory[1].length = 0;
+  lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
   }
 }
 
@@ -516,7 +1080,24 @@ function loop(ts) {
   const dt = Math.min((ts - lastTime) / 1000, 0.05);
   lastTime = ts;
 
-  if (state.phase === 'countdown') {
+  // Track lobby entry for INSERT COIN idle
+  if (state.phase !== prevPhase) {
+    if (state.phase === 'lobby') lobbyEnteredTime = ts;
+    prevPhase = state.phase;
+  }
+
+  if (state.phase === 'boot') {
+    bootLineTimer += dt;
+    while (bootLineTimer >= BOOT_LINE_DELAY && bootLineShown < BOOT_LINES.length) {
+      bootLineShown++; bootLineTimer -= BOOT_LINE_DELAY;
+    }
+    if (bootLineShown >= BOOT_LINES.length) {
+      bootDoneTimer += dt;
+      if (bootDoneTimer > 1.0) state.phase = 'charSelect';
+    }
+  } else if (state.phase === 'lobby') {
+    tickParticles(dt); tickShake(dt); tickFlash(dt);
+  } else if (state.phase === 'countdown') {
     state.cdTimer -= dt;
     state.cdScale = Math.max(1, state.cdScale - dt * 4.5);
     if (state.cdTimer <= 0) {
@@ -556,28 +1137,66 @@ function txt(text, x, y) {
   ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
   ctx.fillText(text, x, y);
 }
+// Fire gradient fill matching the title: top=yellow → bottom=dark red
+// y0/y1 are the top and bottom of the text in current coordinate space
+function fireGrad(y0, y1) {
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0,    '#ffe600');
+  g.addColorStop(0.35, '#ff9900');
+  g.addColorStop(0.7,  '#ff3300');
+  g.addColorStop(1,    '#cc1100');
+  return g;
+}
+// Draw text with glow — does NOT reset shadow
+function glowTxt(text, x, y) { ctx.fillText(text, x, y); }
+
+// ── Draw: boot screen ─────────────────────────────────────────────────────────
+function drawBoot() {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+  const startX = 48, startY = 60, lineH = 24;
+  for (let i = 0; i < Math.min(bootLineShown, BOOT_LINES.length); i++) {
+    const line = BOOT_LINES[i];
+    if (!line) continue;
+    const isCmd = line.startsWith('>');
+    ctx.save();
+    ctx.font = '9px "Press Start 2P", monospace';
+    ctx.fillStyle = isCmd ? '#33ff55' : '#8899bb';
+    ctx.shadowColor = isCmd ? '#33ff55' : 'transparent';
+    ctx.shadowBlur  = isCmd ? 10 : 0;
+    ctx.fillText(line, startX, startY + i * lineH);
+    ctx.restore();
+  }
+  // Blinking cursor at end
+  if (bootLineShown >= BOOT_LINES.length) {
+    const blinkOn = (performance.now() % 700) < 350;
+    if (blinkOn) {
+      ctx.save();
+      ctx.fillStyle = '#33ff55';
+      ctx.shadowColor = '#33ff55'; ctx.shadowBlur = 10;
+      ctx.font = '9px "Press Start 2P", monospace';
+      ctx.fillText('_', startX, startY + BOOT_LINES.length * lineH);
+      ctx.restore();
+    }
+  }
+}
 
 // ── Draw: background ──────────────────────────────────────────────────────────
 function drawBg() {
-  ctx.fillStyle = '#07070f';
+  // Clean dark fill — synthwave grid lives on the page bg canvas, not inside the game box
+  ctx.fillStyle = 'rgba(8, 4, 28, 0.92)';
   ctx.fillRect(0, 0, W, H);
 
-  // Vignette
-  const vg = ctx.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.85);
-  vg.addColorStop(0, 'rgba(0,0,0,0)');
-  vg.addColorStop(1, 'rgba(0,0,0,0.5)');
-  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
-  for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-  ctx.restore();
+  // A handful of pixel stars
+  ctx.fillStyle = '#ffffff';
+  for (const [sx, sy, ss] of BG_STARS) {
+    ctx.fillRect(sx, sy, ss, ss);
+  }
 
   // Side glow based on who's ahead
   if (Math.abs(state.balance) > 0.05) {
-    const col = state.balance > 0 ? P1C : P2C;
+    const col = state.balance > 0 ? P1C() : P2C();
     const gx  = state.balance > 0 ? 0 : W;
     const mag = Math.abs(state.balance);
     const sg  = ctx.createRadialGradient(gx, H/2, 0, gx, H/2, W * 0.6);
@@ -593,78 +1212,99 @@ function drawScore() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
   // Player labels
-  ctx.font = '600 12px Fredoka, Segoe UI';
-  ctx.fillStyle = hexAlpha(P1C, 0.7); txt('PLAYER 1', cx - 155, 20);
-  ctx.fillStyle = hexAlpha(P2C, 0.7); txt('PLAYER 2', cx + 155, 20);
+  ctx.font = '13px "Press Start 2P", monospace';
+  ctx.save(); ctx.shadowColor = P1C(); ctx.shadowBlur = 12;
+  ctx.fillStyle = P1C(); glowTxt('P1', cx - 155, 26); ctx.restore();
+  ctx.save(); ctx.shadowColor = P2C(); ctx.shadowBlur = 12;
+  ctx.fillStyle = P2C(); glowTxt('P2', cx + 155, 26); ctx.restore();
 
-  // Score numbers — no shadow on text, use scale for pop
+  // Score numbers — fire gradient + glow
   ctx.save();
   ctx.translate(cx - 155, 68);
   ctx.scale(scoreScale[0], scoreScale[0]);
-  ctx.font = 'bold 60px Segoe UI';
-  ctx.fillStyle = P1C;
-  txt(state.scores[0], 0, 0);
+  ctx.font = '32px "Press Start 2P", monospace';
+  ctx.shadowColor = P1C(); ctx.shadowBlur = 28;
+  ctx.fillStyle = P1C();
+  ctx.fillText(state.scores[0], 0, 0);
   ctx.restore();
 
   ctx.save();
   ctx.translate(cx + 155, 68);
   ctx.scale(scoreScale[1], scoreScale[1]);
-  ctx.font = 'bold 60px Segoe UI';
-  ctx.fillStyle = P2C;
-  txt(state.scores[1], 0, 0);
+  ctx.font = '32px "Press Start 2P", monospace';
+  ctx.shadowColor = P2C(); ctx.shadowBlur = 28;
+  ctx.fillStyle = P2C();
+  ctx.fillText(state.scores[1], 0, 0);
   ctx.restore();
 
-  // VS pill — glow on the shape, not on text
+  // VS — pixel box
   const vsY = 62;
   ctx.save();
-  ctx.shadowColor = 'rgba(180,120,255,0.55)'; ctx.shadowBlur = 16;
-  ctx.beginPath(); ctx.roundRect(cx - 30, vsY - 18, 60, 36, 18);
-  ctx.fillStyle = '#18112a';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(180,120,255,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 10;
+  ctx.beginPath(); ctx.rect(cx - 24, vsY - 14, 48, 28);
+  ctx.fillStyle = '#0e0800'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,136,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.restore();
-  // VS text — no shadow
-  ctx.font = 'bold 22px Segoe UI';
-  ctx.textBaseline = 'middle';
-  ctx.textAlign = 'right';
-  ctx.fillStyle = P1C; txt('V', cx - 2, vsY);
-  ctx.textAlign = 'left';
-  ctx.fillStyle = P2C; txt('S', cx + 2, vsY);
+  ctx.font = '11px "Press Start 2P", monospace';
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  txt('VS', cx, vsY);
 
   // Round row
   const rowY = 108;
-  const pipR = 7, pipGap = 18;
 
-  // Round label
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = '600 14px Fredoka, Segoe UI';
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  txt(`Round ${state.round} of 3`, cx, rowY);
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.save(); ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 8;
+  ctx.fillStyle = '#ffcc44';
+  glowTxt(`ROUND ${state.round} / 3`, cx, rowY); ctx.restore();
 
-  // P1 pips (left)
-  for (let i = 0; i < 2; i++) {
-    const px = cx - 105 + i * (pipR*2 + 6);
-    const won = i < state.scores[0];
+  // Pixel-art heart (9×8 grid, ps = pixel size)
+  const HEART_FILL = [
+    [0,1,1,0,0,0,1,1,0],
+    [1,1,1,1,0,1,1,1,1],
+    [1,1,1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,1,1,0],
+    [0,0,1,1,1,1,1,0,0],
+    [0,0,0,1,1,1,0,0,0],
+    [0,0,0,0,1,0,0,0,0],
+  ];
+  const HEART_OUTLINE = [
+    [0,1,1,0,0,0,1,1,0],
+    [1,0,0,1,0,1,0,0,1],
+    [1,0,0,0,1,0,0,0,1],
+    [1,0,0,0,0,0,0,0,1],
+    [0,1,0,0,0,0,0,1,0],
+    [0,0,1,0,0,0,1,0,0],
+    [0,0,0,1,0,1,0,0,0],
+    [0,0,0,0,1,0,0,0,0],
+  ];
+
+  function drawHeart(hx, hy, ps, color, filled) {
+    const grid = filled ? HEART_FILL : HEART_OUTLINE;
+    const cols = grid[0].length, rows = grid.length;
+    const ox = hx - (cols * ps) / 2;
+    const oy = hy - (rows * ps) / 2;
     ctx.save();
-    if (won) { ctx.shadowColor = P1C; ctx.shadowBlur = 14; }
-    ctx.beginPath(); ctx.arc(px, rowY, pipR, 0, Math.PI * 2);
-    ctx.fillStyle = won ? P1C : 'rgba(255,255,255,0.1)';
-    ctx.fill();
-    if (!won) { ctx.strokeStyle = hexAlpha(P1C, 0.3); ctx.lineWidth = 1.5; ctx.stroke(); }
+    if (filled) { ctx.shadowColor = color; ctx.shadowBlur = 10; }
+    ctx.fillStyle = filled ? color : hexAlpha('#aabbcc', 0.5);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (grid[r][c]) ctx.fillRect(Math.round(ox + c*ps), Math.round(oy + r*ps), ps, ps);
+      }
+    }
     ctx.restore();
   }
 
-  // P2 pips (right)
+  const ps = 2, hSpacing = 24;
+  // P1 hearts (left of ROUND text)
   for (let i = 0; i < 2; i++) {
-    const px = cx + 85 + i * (pipR*2 + 6);
-    const won = i < state.scores[1];
-    ctx.save();
-    if (won) { ctx.shadowColor = P2C; ctx.shadowBlur = 14; }
-    ctx.beginPath(); ctx.arc(px, rowY, pipR, 0, Math.PI * 2);
-    ctx.fillStyle = won ? P2C : 'rgba(255,255,255,0.1)';
-    ctx.fill();
-    if (!won) { ctx.strokeStyle = hexAlpha(P2C, 0.3); ctx.lineWidth = 1.5; ctx.stroke(); }
-    ctx.restore();
+    drawHeart(cx - 108 + i * hSpacing, rowY, ps, P1C(), i < state.scores[0]);
+  }
+  // P2 hearts (right of ROUND text)
+  for (let i = 0; i < 2; i++) {
+    drawHeart(cx + 88 + i * hSpacing, rowY, ps, P2C(), i < state.scores[1]);
   }
 }
 
@@ -673,116 +1313,231 @@ function drawBar() {
   const bx = BAR_CX - BAR_HALF;
   const by = BAR_Y - BAR_H / 2;
   const bw = BAR_HALF * 2;
-  const r  = BAR_H / 2;
+  const r  = 2; // sharp/pixel look
 
-  // Track bg
+  // ── Segmented retro pixel bar ──────────────────────────────────────────────
+  const N_SEGS = 30, SEG_GAP = 2;
+  const SEG_W  = (bw - (N_SEGS + 1) * SEG_GAP) / N_SEGS;
+  const SEG_H  = BAR_H - 8;
+  const SEG_Y  = by + 4;
+  const half   = N_SEGS / 2;
+
+  // Outer casing
   ctx.save();
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, r);
-  ctx.fillStyle = '#0e0e1c'; ctx.fill();
+  ctx.fillStyle = '#06040e';
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, BAR_H / 2); ctx.fill();
+  ctx.strokeStyle = '#334455'; ctx.lineWidth = 2; ctx.stroke();
   ctx.restore();
 
-  // Fill
-  if (Math.abs(state.balance) > 0.01) {
-    const isP1  = state.balance > 0;
-    const fillW = Math.abs(state.balance) * BAR_HALF;
-    const fillX = isP1 ? BAR_CX : BAR_CX - fillW;
-    const col   = isP1 ? P1C : P2C;
+  // Clip segments to rounded casing shape
+  ctx.save();
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, BAR_H / 2); ctx.clip();
+
+  // Segments
+  const litCount = Math.abs(state.balance) * half;
+  for (let i = 0; i < N_SEGS; i++) {
+    const sx    = bx + SEG_GAP + i * (SEG_W + SEG_GAP);
+    const right = i >= half;
+    const col   = right ? P1C() : P2C();
+    const lit   = right
+      ? (state.balance > 0 && (i - half) < litCount)
+      : (state.balance < 0 && (half - 1 - i) < litCount);
+
+    ctx.fillStyle = lit ? col : hexAlpha(col, 0.08);
+    ctx.beginPath(); ctx.roundRect(sx, SEG_Y, SEG_W, SEG_H, 3); ctx.fill();
+    if (!lit) { ctx.strokeStyle = hexAlpha(col, 0.18); ctx.lineWidth = 1; ctx.stroke(); }
+  }
+
+  ctx.restore(); // end clip
+
+  // Outer glow on the filled side (no shadow bleed inside clip)
+  if (Math.abs(state.balance) > 0.05) {
+    const glowCol = state.balance > 0 ? P1C() : P2C();
     ctx.save();
-    ctx.beginPath(); ctx.roundRect(fillX, by + 4, fillW, BAR_H - 8, 4);
-    const g = ctx.createLinearGradient(fillX, 0, fillX + fillW, 0);
-    if (isP1) { g.addColorStop(0, hexAlpha(col, 0.08)); g.addColorStop(1, col); }
-    else       { g.addColorStop(0, col); g.addColorStop(1, hexAlpha(col, 0.08)); }
-    ctx.fillStyle = g; ctx.fill();
+    ctx.shadowColor = glowCol; ctx.shadowBlur = 12;
+    ctx.strokeStyle = hexAlpha(glowCol, 0.35); ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, BAR_H / 2); ctx.stroke();
     ctx.restore();
   }
 
-  // Center mark
+  // Center tick mark
   ctx.save();
-  ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(BAR_CX, by); ctx.lineTo(BAR_CX, by+BAR_H); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillRect(BAR_CX - 1, by + 1, 2, BAR_H - 2);
   ctx.restore();
 
-  // Track border
-  ctx.save();
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, r);
-  ctx.strokeStyle = '#20203a'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.restore();
+  // ── End zone indicators ────────────────────────────────────────────────────
+  const ezNow   = performance.now() * 0.001;
+  const ezPulse = 0.5 + 0.5 * Math.sin(ezNow * 2.6);
+  const nearR   = Math.max(0, (state.balance  - 0.45) / 0.55); // orb approaching right end
+  const nearL   = Math.max(0, (-state.balance - 0.45) / 0.55); // orb approaching left end
 
-  // Trail
-  const orbX = BAR_CX + state.balance * BAR_HALF;
-  const trailCol = state.balance > 0.05 ? P1C : state.balance < -0.05 ? P2C : '#aaa';
+  // Inner cap glows (clipped to bar shape)
+  const capW = 52;
+  function drawCapGlow(side, col, proximity) {
+    const alpha = 0.14 + ezPulse * 0.10 + proximity * 0.38;
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, BAR_H / 2); ctx.clip();
+    const x0 = side === 'right' ? bx + bw - capW : bx + capW;
+    const x1 = side === 'right' ? bx + bw        : bx;
+    const cg  = ctx.createLinearGradient(x0, 0, x1, 0);
+    cg.addColorStop(0, 'rgba(0,0,0,0)');
+    cg.addColorStop(1, hexAlpha(col, alpha));
+    ctx.fillStyle = cg;
+    ctx.fillRect(side === 'right' ? bx + bw - capW : bx, by, capW, BAR_H);
+    ctx.restore();
+  }
+  drawCapGlow('right', P1C(), nearR);
+  drawCapGlow('left',  P2C(), nearL);
+
+  // Outer chevron arrows
+  function drawChevrons(originX, col, dir, proximity) {
+    const baseAlpha = 0.28 + ezPulse * 0.18 + proximity * 0.54;
+    for (let i = 0; i < 3; i++) {
+      const ax = originX + dir * (9 + i * 9);
+      ctx.save();
+      ctx.globalAlpha = baseAlpha * (1 - i * 0.28);
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ax - dir * 5, BAR_Y - 7);
+      ctx.lineTo(ax,           BAR_Y);
+      ctx.lineTo(ax - dir * 5, BAR_Y + 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  drawChevrons(bx + bw, P1C(),  1, nearR); // right end, pointing right →
+  drawChevrons(bx,      P2C(), -1, nearL); // left end,  pointing left  ←
+
+  // Trail — glowing, quadratic fade
+  const orbX    = BAR_CX + state.balance * BAR_HALF;
+  const trailCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#c8c0ff';
   for (const t of orbTrail) {
-    const frac = 1 - t.age / 0.25;
+    const frac = 1 - t.age / 0.45;
     if (frac <= 0) continue;
     ctx.save();
-    ctx.globalAlpha = frac * 0.22;
-    ctx.beginPath(); ctx.arc(t.x, BAR_Y, ORB_R * frac * 0.5, 0, Math.PI * 2);
+    ctx.globalAlpha = frac * frac * 0.55;
+    ctx.shadowColor = trailCol; ctx.shadowBlur = 10 * frac;
+    ctx.beginPath(); ctx.arc(t.x, BAR_Y, ORB_R * frac * 0.88, 0, Math.PI * 2);
     ctx.fillStyle = trailCol; ctx.fill();
     ctx.restore();
   }
 
-  // Orb — glow on the shape only
-  const curR = ORB_R * (1 + orbBounce * 0.35);
-  const orbCol = state.balance > 0.05 ? P1C : state.balance < -0.05 ? P2C : '#b0b8cc';
+  // Orb — coin spin + pulsing ring + specular
+  const orbCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#e0e0ff';
+  const pt     = performance.now() * 0.002;
+  // Coin spin: X flattens and flips like a coin; Y stays round
+  const coinX  = Math.cos(coinAngle);                // -1..1
+  const scaleX = Math.max(0.08, Math.abs(coinX));    // never fully flat
+  const scaleY = 1 + orbBounce * 0.15;               // slight pop on tap
+
+  // Orbit dots — 3 dots equally spaced, spin faster with velocity
+  const orbitR  = ORB_R * 1.75;
+  const dotR    = 3;
+  const speed   = Math.abs(orbVelX);
   ctx.save();
-  ctx.shadowColor = orbCol;
-  ctx.shadowBlur  = 12;
-  ctx.beginPath(); ctx.arc(orbX, BAR_Y, curR, 0, Math.PI * 2);
-  const og = ctx.createRadialGradient(orbX-5, BAR_Y-6, 1, orbX, BAR_Y, curR);
-  og.addColorStop(0, '#ffffff');
-  og.addColorStop(0.3, orbCol);
-  og.addColorStop(1, shadeHex(orbCol, -40));
+  for (let i = 0; i < 3; i++) {
+    const angle = orbitAngle + (i * Math.PI * 2) / 3;
+    const dx = Math.cos(angle) * orbitR;
+    const dy = Math.sin(angle) * orbitR * 0.45; // flatten vertically so they stay in the bar
+    const alpha = 0.4 + speed * 0.5 + 0.15 * Math.sin(angle * 2); // shimmer
+    ctx.save();
+    ctx.shadowColor = orbCol; ctx.shadowBlur = 8;
+    ctx.fillStyle = hexAlpha(orbCol, Math.min(1, alpha));
+    ctx.beginPath();
+    ctx.arc(orbX + dx, BAR_Y + dy, dotR * (0.7 + speed * 0.4), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(orbX, BAR_Y);
+  ctx.scale(scaleX, scaleY);
+
+  // Main body with strong glow
+  ctx.save();
+  ctx.shadowColor = orbCol; ctx.shadowBlur = 26;
+  ctx.beginPath(); ctx.arc(0, 0, ORB_R, 0, Math.PI * 2);
+  const og = ctx.createRadialGradient(-ORB_R * 0.3, -ORB_R * 0.3, 0, 0, 0, ORB_R);
+  og.addColorStop(0,    '#ffffff');
+  og.addColorStop(0.2,  'rgba(255,255,255,0.85)');
+  og.addColorStop(0.5,  orbCol);
+  og.addColorStop(1,    shadeHex(orbCol, -55));
   ctx.fillStyle = og; ctx.fill();
   ctx.restore();
+
+  // Specular highlight — shifts with coin face direction
+  const hlX = -Math.sign(coinX || 1) * ORB_R * 0.28;
+  ctx.save();
+  ctx.globalAlpha = 0.72;
+  ctx.beginPath(); ctx.arc(hlX, -ORB_R * 0.28, ORB_R * 0.23, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.restore();
+
+  ctx.restore(); // pop squash/stretch transform
 }
 
 // ── Draw: player side panels ──────────────────────────────────────────────────
 function drawPlayers() {
-  const p1x = 62, p2x = W - 62, py = BAR_Y;
+  const p1x = 140, p2x = W - 140, py = BAR_Y;
 
   function side(px, player, flash, tps) {
-    const col = player === 1 ? P1C : P2C;
+    const col = player === 1 ? P1C() : P2C();
     const key = player === 1 ? 'A' : 'L';
     const fa  = flash / 0.18;
 
-    // Key circle — glow on shape only
+    // Key square — pixel/retro style
     ctx.save();
-    if (flash > 0) { ctx.shadowColor = col; ctx.shadowBlur = 32 * fa; }
-    ctx.beginPath(); ctx.arc(px, py, 32, 0, Math.PI * 2);
-    ctx.fillStyle = flash > 0 ? hexAlpha(col, 0.15 + 0.2 * fa) : hexAlpha(col, 0.07);
+    if (flash > 0) { ctx.shadowColor = col; ctx.shadowBlur = 28 * fa; }
+    ctx.beginPath(); ctx.rect(px - 28, py - 28, 56, 56);
+    ctx.fillStyle = flash > 0 ? hexAlpha(col, 0.18 + 0.18 * fa) : hexAlpha(col, 0.07);
     ctx.fill();
-    ctx.strokeStyle = flash > 0 ? col : hexAlpha(col, 0.3);
-    ctx.lineWidth = flash > 0 ? 2.5 : 1.5; ctx.stroke();
+    ctx.strokeStyle = flash > 0 ? col : hexAlpha(col, 0.4);
+    ctx.lineWidth = flash > 0 ? 2 : 1.5; ctx.stroke();
     ctx.restore();
 
-    // Key letter — no shadow
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = 'bold 20px monospace';
-    ctx.fillStyle = flash > 0 ? '#fff' : col;
-    txt(key, px, py);
+    // Alien icon (selected character) above key box
+    const alienIdx = player === 1 ? state.p1Icon : state.p2Icon;
+    ctx.save();
+    if (flash > 0) { ctx.shadowColor = col; ctx.shadowBlur = 20 * fa; }
+    drawAlienSprite(alienIdx, px, py - 52, 4);
+    ctx.restore();
 
-    // TPS speed bar
-    const barY = py + 50, barW = 48, barH = 7;
+    // Key letter (small, below)
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = '14px "Press Start 2P", monospace';
+    ctx.save();
+    ctx.shadowColor = col; ctx.shadowBlur = flash > 0 ? 24 : 14;
+    ctx.fillStyle = flash > 0 ? '#fff' : col;
+    glowTxt(key, px, py);
+    ctx.restore();
+
+    // TPS speed bar — pixel style
+    const barY = py + 46, barW = 48, barH = 6;
     const filled = Math.min(tps / 12, 1);
     ctx.save();
-    ctx.beginPath(); ctx.roundRect(px - barW/2, barY, barW, barH, 3);
-    ctx.fillStyle = '#0e0e1c'; ctx.fill();
+    ctx.beginPath(); ctx.rect(px - barW/2, barY, barW, barH);
+    ctx.fillStyle = '#080818'; ctx.fill();
+    ctx.strokeStyle = hexAlpha(col, 0.2); ctx.lineWidth = 1; ctx.stroke();
     if (filled > 0) {
-      ctx.beginPath(); ctx.roundRect(px - barW/2, barY, barW * filled, barH, 3);
-      const sg = ctx.createLinearGradient(px - barW/2, 0, px + barW/2, 0);
-      sg.addColorStop(0, hexAlpha(col, 0.35)); sg.addColorStop(1, col);
-      ctx.fillStyle = sg; ctx.fill();
+      ctx.beginPath(); ctx.rect(px - barW/2, barY, barW * filled, barH);
+      ctx.shadowColor = col; ctx.shadowBlur = 6;
+      ctx.fillStyle = col; ctx.fill();
     }
     ctx.restore();
 
-    // Stats text — no shadow, readable opacity
-    ctx.font = '600 13px Fredoka, Segoe UI';
-    ctx.fillStyle = hexAlpha(col, 0.85);
-    txt(`${tps} t/s`, px, barY + barH + 14);
+    ctx.save();
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.shadowColor = col; ctx.shadowBlur = 10;
+    ctx.fillStyle = col;
+    glowTxt(`${tps}/s`, px, barY + barH + 11);
+    ctx.restore();
 
-    ctx.font = '11px Segoe UI';
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    txt(`${state.tapCount[player-1]} taps`, px, barY + barH + 29);
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = 'rgba(255,220,120,0.55)';
+    txt(`${state.tapCount[player-1]}`, px, barY + barH + 24);
   }
 
   side(p1x, 1, state.tapFlash[0], getTPS(1));
@@ -796,32 +1551,38 @@ function drawRoundTimer() {
   const cx   = W / 2;
   const cy   = BAR_Y - 72;
   const urgent = t <= 5;
-  const color  = urgent ? '#ff4444' : 'rgba(255,255,255,0.75)';
+  const color  = urgent ? '#ff2020' : '#ffffff';
 
-  // Arc progress track
-  const prog = t / ROUND_TIME;
-  const arcR = 26;
+  // Pixel progress bar (horizontal, above timer text)
+  const prog  = t / ROUND_TIME;
+  const barW  = 80, barH = 5;
   ctx.save();
-  ctx.beginPath(); ctx.arc(cx, cy, arcR, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.07)'; ctx.lineWidth = 5; ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(cx, cy, arcR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog, false);
-  if (urgent) { ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 14; }
-  ctx.strokeStyle = urgent ? '#ff4444' : 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.stroke();
+  ctx.beginPath(); ctx.rect(cx - barW/2, cy - 24, barW, barH);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
+  if (prog > 0) {
+    ctx.beginPath(); ctx.rect(cx - barW/2, cy - 24, barW * prog, barH);
+    ctx.shadowColor = urgent ? '#ff2020' : '#ff8800'; ctx.shadowBlur = 10;
+    ctx.fillStyle = urgent ? '#ff2020' : fireGrad(cy - 24, cy - 19); ctx.fill();
+  }
   ctx.restore();
 
-  // Number inside
+  // Timer number — fire gradient
+  const fs = urgent ? 16 : 14;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `bold ${urgent ? 22 : 20}px Segoe UI`;
-  ctx.fillStyle = color;
-  txt(secs, cx, cy);
+  ctx.save();
+  ctx.shadowColor = urgent ? '#ff2020' : '#ff8800'; ctx.shadowBlur = urgent ? 22 : 14;
+  ctx.font = `${fs}px "Press Start 2P", monospace`;
+  ctx.fillStyle = urgent ? '#ff2020' : fireGrad(cy - fs/2, cy + fs/2);
+  glowTxt(secs, cx, cy);
+  ctx.restore();
 
-  // "FINAL 5!" banner
   if (urgent) {
-    ctx.font = '600 11px Fredoka, Segoe UI';
-    ctx.fillStyle = '#ff6666';
-    txt('FINAL 5!', cx, cy + arcR + 13);
+    ctx.save();
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 12;
+    ctx.fillStyle = '#ff4040';
+    glowTxt('HURRY!', cx, cy + 20);
+    ctx.restore();
   }
 }
 
@@ -830,42 +1591,310 @@ function drawCountdown() {
   const text = state.countdown > 0 ? String(state.countdown) : 'GO!';
   ctx.save();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.translate(W/2, H/2 - 10);
+  ctx.translate(W/2, TIMER_CY);
   ctx.scale(state.cdScale, state.cdScale);
   if (state.countdown === 0) {
-    ctx.font = 'bold 88px Segoe UI'; ctx.fillStyle = '#50e878';
-    ctx.shadowColor = '#50e878'; ctx.shadowBlur = 40;
+    ctx.font = '48px "Press Start 2P", monospace';
+    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 50;
+    ctx.fillStyle = fireGrad(-24, 24);
   } else {
-    ctx.font = 'bold 104px Segoe UI'; ctx.fillStyle = '#ffffff';
-    ctx.shadowColor = 'rgba(255,255,255,0.35)'; ctx.shadowBlur = 28;
+    ctx.font = '56px "Press Start 2P", monospace';
+    ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 40;
+    ctx.fillStyle = fireGrad(-28, 28);
   }
-  ctx.fillText(text, 0, 0); // countdown glow is intentional here
+  ctx.fillText(text, 0, 0);
   ctx.restore();
 }
 
 // ── Draw: overlays ────────────────────────────────────────────────────────────
 function drawOverlay(color, title, sub) {
-  ctx.fillStyle = 'rgba(0,0,0,0.68)';
-  ctx.fillRect(0, 0, W, H);
+  // Transparent at top so the score header stays readable, dark from ~130px down
+  const og = ctx.createLinearGradient(0, 100, 0, 155);
+  og.addColorStop(0, 'rgba(0,0,0,0)');
+  og.addColorStop(1, 'rgba(0,0,0,0.72)');
+  ctx.fillStyle = og;
+  ctx.fillRect(0, 0, W, 155);
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 155, W, H - 155);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
-  // Title glow — drawn as bg shape, then crisp text on top
+  // Title — fire gradient + strong glow
   ctx.save();
-  ctx.font = 'bold 50px Segoe UI';
-  ctx.shadowColor = color; ctx.shadowBlur = 45;
-  ctx.fillStyle = color; ctx.fillText(title, W/2, H/2 - 28);
+  ctx.font = '20px "Press Start 2P", monospace';
+  ctx.shadowColor = '#ff6600'; ctx.shadowBlur = 50;
+  ctx.fillStyle = fireGrad(H/2 - 32, H/2 - 12);
+  ctx.fillText(title, W/2, H/2 - 22);
   ctx.restore();
-  // Crisp text pass over the blurred one
-  ctx.font = 'bold 50px Segoe UI';
-  ctx.fillStyle = color;
-  txt(title, W/2, H/2 - 28);
 
-  ctx.font = '600 17px Fredoka, Segoe UI';
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  txt(sub, W/2, H/2 + 24);
+  if (sub) {
+    ctx.save();
+    ctx.font = '8px "Press Start 2P", monospace';
+    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ffcc44';
+    glowTxt(sub, W/2, H/2 + 20);
+    ctx.restore();
+  }
 }
 
-// ── Draw: screen flash ────────────────────────────────────────────────────────
+// ── Draw: win celebration alien ───────────────────────────────────────────────
+function drawWinCelebration() {
+  if (state.roundWinner === 0) return;
+  const w        = state.roundWinner;
+  const alienIdx = w === 1 ? state.p1Icon : state.p2Icon;
+  const col      = w === 1 ? P1C() : P2C();
+  const t        = performance.now() * 0.001;
+  const elapsed  = 3.2 - state.reTimer;  // 0 → 3.2 as round-end plays out
+  const cx = W / 2, cy = H / 2 + 62;
+
+  let finalX = cx, finalY = cy, finalRot = 0, finalSX = 1, finalSY = 1, glow = 36;
+
+  if (elapsed < 0.55) {
+    // Phase 1: spin-in + drop from above (0 → 0.55s)
+    const p  = elapsed / 0.55;                           // 0..1
+    const ep = 1 - Math.pow(1 - p, 3);                   // ease-out cubic
+    // Overshoot scale: grows past 1 then settles
+    const sc = p < 0.75
+      ? ep * 1.35
+      : 1.35 - (p - 0.75) / 0.25 * 0.35;
+    finalRot = (1 - ep) * Math.PI * 2.5;                 // 2.5 full spins → 0
+    finalSX  = sc; finalSY = sc;
+    finalY   = cy - (1 - ep) * 70;                       // drop in from above
+    glow     = 55 + ep * 20;
+  } else if (elapsed < 1.3) {
+    // Phase 2: rapid victory hops (0.55 → 1.3s)
+    // Use 3 full hops (integer) so sin(3π)=0 and alien lands cleanly at cy on exit
+    const p   = (elapsed - 0.55) / 0.75;
+    const hop = -Math.abs(Math.sin(p * Math.PI * 3)) * 22;
+    const sc  =  1 + Math.abs(Math.sin(p * Math.PI * 3)) * 0.12;
+    finalY   = cy + hop;
+    finalSX  = sc * (1 - Math.abs(Math.sin(p * Math.PI * 3)) * 0.08);
+    finalSY  = sc;
+    glow     = 48;
+  } else {
+    // Phase 3: blend into alien's own animation over 0.4s so there's no hard cut
+    const blend = Math.min(1, (elapsed - 1.3) / 0.4); // 0→1 over 0.4s
+    const { dx, dy, sx, sy, rot } = alienAnim(alienIdx, t);
+    finalX   = cx + dx * 2.2 * blend;
+    finalY   = cy + dy * 2.2 * blend; // starts at cy (same as phase-2 landing), eases into animation
+    finalRot = rot * blend;
+    finalSX  = sx; finalSY = sy;
+    glow     = 38;
+  }
+
+  ctx.save();
+  ctx.shadowColor = col; ctx.shadowBlur = glow;
+  ctx.translate(finalX, finalY);
+  if (finalRot) ctx.rotate(finalRot);
+  ctx.scale(finalSX, finalSY);
+  drawAlienSprite(alienIdx, 0, 0, 7);
+  ctx.restore();
+}
+
+// ── Draw: character select ────────────────────────────────────────────────────
+function drawCharSelect() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  // Title
+  ctx.save();
+  ctx.font = '10px "Press Start 2P", monospace';
+  ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+  ctx.fillStyle = '#fff';
+  txt('CHOOSE YOUR FIGHTER', W / 2, 22);
+  ctx.restore();
+
+  const CELL = 68, COLS = 4;
+  const GRID_W = CELL * COLS; // 272
+  const GRID_H = CELL * COLS; // 272
+  const GRID_Y = Math.round((H - GRID_H) / 2) + 10; // vertically centered with slight offset for header
+
+  const p1gx = W / 4 - GRID_W / 2;   // left panel grid left edge
+  const p2gx = W * 3 / 4 - GRID_W / 2; // right panel grid left edge
+
+  [1, 2].forEach(p => {
+    const gx     = p === 1 ? p1gx : p2gx;
+    const cursor = p === 1 ? state.p1Cursor : state.p2Cursor;
+    const pc     = ALIENS[cursor].c;
+    const prevKey = p === 1 ? 'A' : 'K';
+    const nextKey = p === 1 ? 'S' : 'L';
+
+    const panCX = gx + GRID_W / 2;
+    const kw = 22, kh = 20;
+
+    function keyCap(label, kx, ky) {
+      ctx.save();
+      ctx.shadowColor = pc; ctx.shadowBlur = 8;
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.strokeStyle = pc; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(kx - kw/2, ky - kh/2, kw, kh); ctx.fill(); ctx.stroke();
+      ctx.font = '8px "Press Start 2P", monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(label, kx, ky);
+      ctx.restore();
+    }
+
+    // Player label
+    ctx.save();
+    ctx.font = '12px "Press Start 2P", monospace';
+    ctx.shadowColor = pc; ctx.shadowBlur = 18;
+    ctx.fillStyle = pc;
+    txt(`PLAYER ${p}`, panCX, GRID_Y - 44);
+    ctx.restore();
+
+    // Key caps row: ← [Q]   [A] →  (with breathing room below player label)
+    const hintY = GRID_Y - 20;
+    const prevKX = panCX - 36, nextKX = panCX + 36;
+
+    keyCap(prevKey, prevKX, hintY);
+    keyCap(nextKey, nextKX, hintY);
+
+    // Arrows beside the key caps
+    ctx.save();
+    ctx.font = 'bold 18px Arial, sans-serif';
+    ctx.shadowColor = pc; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';  ctx.textBaseline = 'middle';
+    ctx.fillText('◀', prevKX - kw/2 - 6, hintY);
+    ctx.textAlign = 'left';
+    ctx.fillText('▶', nextKX + kw/2 + 6, hintY);
+    ctx.restore();
+
+    // 4×4 grid
+    for (let i = 0; i < 16; i++) {
+      const col = i % COLS;
+      const row = Math.floor(i / COLS);
+      const cx  = gx + col * CELL + CELL / 2;
+      const cy  = GRID_Y + row * CELL + CELL / 2;
+      const sel = i === cursor;
+
+      // Cell bg + border
+      ctx.save();
+      ctx.fillStyle   = sel ? 'rgba(255,255,255,0.13)' : 'rgba(255,255,255,0.03)';
+      ctx.strokeStyle = sel ? pc : 'rgba(255,255,255,0.1)';
+      ctx.lineWidth   = sel ? 2 : 1;
+      if (sel) { ctx.shadowColor = pc; ctx.shadowBlur = 16; }
+      ctx.beginPath();
+      ctx.rect(gx + col * CELL + 3, GRID_Y + row * CELL + 3, CELL - 6, CELL - 6);
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+
+      // Alien sprite — animated when selected
+      ctx.save();
+      if (sel) {
+        const t = performance.now() * 0.001;
+        const { dx, dy, sx, sy, rot } = alienAnim(i, t);
+        ctx.shadowColor = ALIENS[i].c; ctx.shadowBlur = 20;
+        ctx.translate(cx + dx, cy + dy);
+        if (rot) ctx.rotate(rot);
+        ctx.scale(sx, sy);
+        drawAlienSprite(i, 0, 0, 4);
+      } else {
+        drawAlienSprite(i, cx, cy, 3);
+      }
+      ctx.restore();
+    }
+
+  });
+
+  // Divider line between panels
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(W / 2, GRID_Y - 52); ctx.lineTo(W / 2, GRID_Y + GRID_H + 16);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Bottom "press space" blink
+  const blinkOn = (performance.now() % 1100) < 660;
+  ctx.save();
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.shadowColor = '#ffee00'; ctx.shadowBlur = blinkOn ? 14 : 0;
+  ctx.fillStyle = blinkOn ? '#ffee00' : 'rgba(255,238,0,0.15)';
+  txt('PRESS SPACE TO CONFIRM', W / 2, GRID_Y + GRID_H + 26);
+  ctx.restore();
+}
+
+// ── Draw: lobby ───────────────────────────────────────────────────────────────
+function drawLobby() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  const blinkOn = (performance.now() % 1100) < 605;
+  if (blinkOn) {
+    const hov = lobbyHover;
+    ctx.save();
+    ctx.font = '11px "Press Start 2P", monospace';
+    ctx.shadowColor = hov ? '#ffffff' : '#ffee00';
+    ctx.shadowBlur  = hov ? 28 : 16;
+    ctx.fillStyle   = hov ? '#ffffff' : '#ffee00';
+    glowTxt('PRESS SPACE TO START', W/2, LOBBY_BTN.y + LOBBY_BTN.h / 2);
+    ctx.restore();
+  }
+
+  // Per-player win counts
+  const w1 = getWins(1), w2 = getWins(2);
+  if (w1 > 0 || w2 > 0) {
+    const wy = LOBBY_BTN.y + LOBBY_BTN.h / 2 + 30;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.save();
+    ctx.fillStyle = hexAlpha(P1C(), 0.6);
+    ctx.shadowColor = P1C(); ctx.shadowBlur = 6;
+    ctx.textAlign = 'right';
+    ctx.fillText(`P1 WINS: ${w1}`, W / 2 - 10, wy);
+    ctx.restore();
+    ctx.save();
+    ctx.fillStyle = hexAlpha(P2C(), 0.6);
+    ctx.shadowColor = P2C(); ctx.shadowBlur = 6;
+    ctx.textAlign = 'left';
+    ctx.fillText(`P2 WINS: ${w2}`, W / 2 + 10, wy);
+    ctx.restore();
+  }
+}
+
+// ── Draw: change players button (top-left) ────────────────────────────────────
+const CHANGE_BTN = { x: 8, y: 8, w: 0, h: 16 }; // w set dynamically
+let changeHover = false;
+
+function drawChangeBtn() {
+  const PAD = 8, by = CHANGE_BTN.y, bh = CHANGE_BTN.h;
+  ctx.font = '6px "Press Start 2P", monospace';
+  const label = 'Change Player';
+  const tw = ctx.measureText(label).width;
+  const bw = tw + PAD * 2;
+  const bx = CHANGE_BTN.x;
+  CHANGE_BTN.w = bw; // keep in sync for hit-testing
+  ctx.save();
+  ctx.beginPath(); ctx.rect(bx, by, bw, bh);
+  ctx.fillStyle = changeHover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+  ctx.fill();
+  ctx.strokeStyle = changeHover ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = changeHover ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.4)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, bx + bw / 2, by + bh / 2);
+  ctx.restore();
+}
+
+// ── Draw: esc hint (top-right) ────────────────────────────────────────────────
+function drawEscHint() {
+  const PAD = 8, by = 8, bh = 16;
+  ctx.font = '6px "Press Start 2P", monospace';
+  const label = 'ESC to Restart';
+  const tw = ctx.measureText(label).width;
+  const bw = tw + PAD * 2;
+  const bx = W - bw - 8;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(bx, by, bw, bh);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(label, bx + bw / 2, by + bh / 2);
+  ctx.restore();
+}
+
 function drawScreenFlash() {
   if (flashAlpha <= 0) return;
   const fg = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W * 0.7);
@@ -881,7 +1910,21 @@ function draw() {
   ctx.save();
   ctx.translate(sx, sy);
 
+  if (state.phase === 'boot') {
+    drawBoot();
+    ctx.restore();
+    return;
+  }
+
   drawBg();
+
+  if (state.phase === 'charSelect') {
+    drawCharSelect();
+    drawScreenFlash();
+    ctx.restore();
+    return;
+  }
+
   drawScore();
   drawMeter(1);
   drawMeter(2);
@@ -889,22 +1932,95 @@ function draw() {
   drawPlayers();
   drawParticles();
 
-  if      (state.phase === 'playing')   { drawRoundTimer(); }
+  if      (state.phase === 'lobby')     { drawLobby(); }
+  else if (state.phase === 'playing')   { drawRoundTimer(); }
   else if (state.phase === 'countdown') { drawCountdown(); }
   else if (state.phase === 'roundEnd')  {
-    const col = state.roundWinner === 1 ? P1C : P2C;
-    drawOverlay(col, `Player ${state.roundWinner} wins the round!`, 'Next round starting…');
+    if (state.roundWinner === 0) {
+      drawOverlay('#aaaaaa', 'DRAW!', '');
+    } else {
+      const col = state.roundWinner === 1 ? P1C() : P2C();
+      const ws = state.scores[state.roundWinner - 1];
+      const matchWon = ws >= 2;
+      drawOverlay(col,
+        matchWon ? `Player ${state.roundWinner} wins!` : `Player ${state.roundWinner} wins the round!`,
+        matchWon ? `${state.scores[0]} – ${state.scores[1]}` : '');
+      drawWinCelebration();
+    }
   }
   else if (state.phase === 'gameOver')  {
-    const w = state.scores[0] >= 2 ? 1 : 2;
-    drawOverlay(w === 1 ? P1C : P2C,
-      `Player ${w} wins the match!`,
-      `${state.scores[0]} – ${state.scores[1]}   ·   press R to play again`);
+    const w = state.scores[0] > state.scores[1] ? 1 : state.scores[1] > state.scores[0] ? 2 : 0;
+    if (w === 0) {
+      drawOverlay('#aaaaaa', 'MATCH DRAW!', `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
+    } else {
+      drawOverlay(w === 1 ? P1C() : P2C(),
+        `Player ${w} wins!`,
+        `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
+      drawWinCelebration();
+    }
   }
 
+  drawPowerUp();
+  drawComboTexts();
+  drawPuTexts();
+  drawEffectHud();
+  drawChangeBtn();
+  drawEscHint();
   drawScreenFlash();
   ctx.restore();
 }
+
+// ── Full-page synthwave background canvas ─────────────────────────────────────
+(function() {
+  const bgc = document.getElementById('bg-canvas');
+  const bx  = bgc.getContext('2d');
+  function paintBg() {
+    const bw = window.innerWidth, bh = window.innerHeight;
+    bgc.width  = bw;
+    bgc.height = bh;
+
+    const g = bx.createLinearGradient(0, 0, 0, bh);
+    g.addColorStop(0,    '#1e1068');
+    g.addColorStop(0.44, '#100840');
+    g.addColorStop(0.5,  '#04011a');
+    g.addColorStop(0.56, '#100840');
+    g.addColorStop(1,    '#1e1068');
+    bx.fillStyle = g;
+    bx.fillRect(0, 0, bw, bh);
+
+    const vx = bw / 2, vy = bh / 2;
+    bx.strokeStyle = '#3399cc';
+    bx.lineWidth = 1;
+    bx.globalAlpha = 0.45;
+    function grid(toY) {
+      const sign = toY > vy ? 1 : -1, span = Math.abs(toY - vy);
+      for (let i = 0; i <= 14; i++) {
+        bx.beginPath(); bx.moveTo(vx, vy); bx.lineTo((i/14)*bw, toY); bx.stroke();
+      }
+      for (let j = 1; j <= 9; j++) {
+        const t = Math.pow(j/9, 0.55), y = vy + sign*span*t, fr = Math.abs(y-vy)/span;
+        bx.beginPath(); bx.moveTo(vx - vx*fr, y); bx.lineTo(vx + (bw-vx)*fr, y); bx.stroke();
+      }
+    }
+    grid(bh); grid(0);
+    bx.globalAlpha = 1;
+
+    bx.fillStyle = '#ffffff';
+    for (let i = 0; i < 50; i++) {
+      const rx = Math.sin(i*127.1+311.7)*43758.5453, sx = (rx-Math.floor(rx))*bw;
+      const ry = Math.sin(i*269.5+183.3)*43758.5453, sy = (ry-Math.floor(ry))*bh;
+      const rs = Math.sin(i*419.2+77.1) *43758.5453, ss = (rs-Math.floor(rs))<0.3?2:1;
+      bx.fillRect(Math.round(sx), Math.round(sy), ss, ss);
+    }
+
+    const vg = bx.createRadialGradient(bw/2,bh/2,bh*0.2, bw/2,bh/2,bh*0.85);
+    vg.addColorStop(0, 'rgba(0,0,0,0)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.6)');
+    bx.fillStyle = vg; bx.fillRect(0, 0, bw, bh);
+  }
+  paintBg();
+  window.addEventListener('resize', paintBg);
+})();
 
 requestAnimationFrame(loop);
 </script>
