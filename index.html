@@ -787,7 +787,7 @@ const PU_TYPES = [
   { id: 'freeze', label: 'FRZ', col: '#88ffee', desc: 'FREEZE!',     dur: 2.5 },
 ];
 let powerUp = null;   // { pos: -1..1, typeIdx, age }
-let puSpawnTimer = 7;
+let puSpawnTimer = 5;
 const puEffects = [{ id: null, timer: 0 }, { id: null, timer: 0 }];
 
 function spawnPowerUp() {
@@ -805,11 +805,11 @@ function collectPowerUp(player) {
   addPuText(pu.desc, px, BAR_Y - 28, pu.col);
   addFlash(pu.col, 0.28);
   powerUp = null;
-  puSpawnTimer = 5 + Math.random() * 4;
+  puSpawnTimer = 4 + Math.random() * 2;
 }
 function tickPowerUp(dt) {
   puSpawnTimer -= dt;
-  if (!powerUp && puSpawnTimer <= 0) { spawnPowerUp(); puSpawnTimer = 5 + Math.random() * 4; }
+  if (!powerUp && puSpawnTimer <= 0) { spawnPowerUp(); puSpawnTimer = 4 + Math.random() * 2; }
   if (powerUp) {
     powerUp.age += dt;
     if (Math.abs(state.balance - powerUp.pos) < 0.055) {
@@ -901,7 +901,7 @@ function initState() {
   lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
   comboTexts.length = 0; puTexts.length = 0;
   lastComboShow[0] = lastComboShow[1] = 0;
-  powerUp = null; puSpawnTimer = 7;
+  powerUp = null; puSpawnTimer = 5;
   puEffects[0] = { id: null, timer: 0 };
   puEffects[1] = { id: null, timer: 0 };
 }
@@ -2048,14 +2048,17 @@ const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 _canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   for (const touch of e.changedTouches) {
-    const { mx } = canvasCoords(touch);
+    // Use physical screen midpoint of the canvas to avoid zoom coordinate issues
+    const r = _canvas.getBoundingClientRect();
+    const midX = r.left + r.width / 2;
+    const isLeft = touch.clientX < midX;
     if (state.phase === 'playing') {
-      if (mx < W / 2) onTap(1); else onTap(2);
+      if (isLeft) onTap(1); else onTap(2);
     } else if (state.phase === 'lobby') {
       startCountdown();
     } else if (state.phase === 'charSelect') {
-      if (mx < W / 2) state.p1Cursor = (state.p1Cursor + 1) % 16;
-      else             state.p2Cursor = (state.p2Cursor + 1) % 16;
+      if (isLeft) state.p1Cursor = (state.p1Cursor + 1) % 16;
+      else        state.p2Cursor = (state.p2Cursor + 1) % 16;
     } else if (state.phase === 'gameOver') {
       const i1 = state.p1Icon, i2 = state.p2Icon;
       initState();
