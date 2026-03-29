@@ -17,7 +17,8 @@
     justify-content: center;
     min-height: 100vh;
     user-select: none;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     animation: bodyThud 0.35s ease-out 0.05s both;
     touch-action: manipulation;
   }
@@ -281,16 +282,23 @@ const ORB_R    = 19;
 
 // ── Lobby button — sits where the round timer lives ───────────────────────────
 const TIMER_CY  = BAR_Y - 72;  // 176
-const LOBBY_BTN = { x: W/2 - 100, y: TIMER_CY - 22, w: 200, h: 44 };
+const LOBBY_BTN    = { x: W/2 - 100, y: TIMER_CY - 22, w: 200, h: 44 };
+const HOW_BTN      = { x: W/2 - 56, y: 8, w: 112, h: 16 };
+const HS_BTN       = { x: 0, y: 8, w: 0, h: 16 }; // x/w set dynamically in drawLobby
+let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
+const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+let nameEntryState = { letters: ['A','A','A'], cursor: 0, winner: 1 };
+let lbNewName      = null; // name to highlight after entry
 
 // Pre-generated star positions for background
-const BG_STARS = Array.from({length: 35}, (_, i) => {
+const BG_STARS = Array.from({length: 90}, (_, i) => {
   const rng = Math.sin(i * 127.1 + 311.7) * 43758.5453;
   const x   = (rng - Math.floor(rng)) * W;
   const rng2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
   const y   = (rng2 - Math.floor(rng2)) * H;
   const rng3 = Math.sin(i * 419.2 + 77.1) * 43758.5453;
-  const s   = (rng3 - Math.floor(rng3)) < 0.3 ? 2 : 1;
+  const f   = rng3 - Math.floor(rng3);
+  const s   = f < 0.15 ? 3 : f < 0.45 ? 2 : 1;
   return [Math.round(x), Math.round(y), s];
 });
 let lobbyHover  = false;
@@ -782,7 +790,7 @@ function drawPuTexts() {
 // ── Power-ups ─────────────────────────────────────────────────────────────────
 const PU_TYPES = [
   { id: 'speed',  label: 'SPD', col: '#ffee00', desc: 'SPEED UP!',   dur: 4.0 },
-  { id: 'shield', label: 'SHD', col: '#44aaff', desc: 'SHIELD!',     dur: 3.5 },
+  { id: 'reverse', label: 'REV', col: '#ff4444', desc: 'REVERSE!',   dur: 2.5 },
   { id: 'freeze', label: 'FRZ', col: '#88ffee', desc: 'FREEZE!',     dur: 2.5 },
 ];
 let powerUp = null;   // { pos: -1..1, typeIdx, age }
@@ -848,6 +856,19 @@ function drawPowerUp() {
 function getWins(p) { try { return parseInt(localStorage.getItem(`spamwars_wins_p${p}`) || '0'); } catch { return 0; } }
 function addWin(p)  { try { localStorage.setItem(`spamwars_wins_p${p}`, getWins(p) + 1); }          catch {} }
 
+// ── Leaderboard storage ───────────────────────────────────────────────────────
+function getLB() { try { return JSON.parse(localStorage.getItem('spamwars_lb') || '[]'); } catch { return []; } }
+function saveLB(lb) { try { localStorage.setItem('spamwars_lb', JSON.stringify(lb)); } catch {} }
+function addLBEntry(name, icon, spamCount, spamRate) {
+  const lb = getLB();
+  const ex = lb.find(e => e.name === name);
+  const date = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
+  if (ex) { ex.wins++; ex.icon = icon; ex.date = date; ex.spamCount = spamCount; ex.spamRate = spamRate; }
+  else lb.push({ name, wins: 1, icon, date, spamCount, spamRate });
+  lb.sort((a, b) => b.wins - a.wins);
+  saveLB(lb.slice(0, 10));
+}
+
 // ── Lobby idle tracking ────────────────────────────────────────────────────────
 let lobbyEnteredTime = 0;
 let prevPhase = null;
@@ -886,7 +907,7 @@ function initState() {
     phase: 'boot', countdown: 3, cdTimer: 1.0, cdScale: 1.6,
     reTimer: 0, roundWinner: null,
     roundTimer: ROUND_TIME,
-    tapFlash: [0, 0], tapCount: [0, 0],
+    tapFlash: [0, 0], tapCount: [0, 0], totalTaps: [0, 0], timeActive: [0, 0],
     p1Icon: 0, p2Icon: 8,
     p1Cursor: 0, p2Cursor: 8,
   };
@@ -909,6 +930,7 @@ initState();
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 function startCountdown() {
+  state.balance = 0;
   state.phase = 'countdown';
   state.countdown = 3; state.cdTimer = 1.0; state.cdScale = 1.6;
 }
@@ -918,7 +940,9 @@ document.addEventListener('keydown', e => {
   if (['a','s','l','k',' '].includes(k)) e.preventDefault();
   if (k === 'escape') {
     e.preventDefault();
-    if (state.phase === 'charSelect') return; // ESC does nothing on char select
+    if (state.phase === 'charSelect') return;
+    if (state.phase === 'nameEntry') { state.phase = 'leaderboard'; return; }
+    if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
     const i1 = state.p1Icon, i2 = state.p2Icon;
     initState();
     state.p1Icon = i1; state.p2Icon = i2;
@@ -942,6 +966,22 @@ document.addEventListener('keydown', e => {
     if (k === ' ') { state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby'; return; }
     return;
   }
+  if (k === ' ' && state.phase === 'howToPlay') { localStorage.setItem('spamwars_seen_howto','1'); state.phase = howToPlayFrom; return; }
+  if (state.phase === 'nameEntry') {
+    const ne = nameEntryState;
+    const ch = k.length === 1 && /[a-z0-9]/i.test(k) ? k.toUpperCase() : null;
+    if (ch) {
+      ne.letters[ne.cursor] = ch;
+      if (ne.cursor < 9) { ne.cursor++; } else { submitNameEntry(); }
+      return;
+    }
+    if (k === 'backspace') {
+      if (ne.cursor > 0) { ne.cursor--; ne.letters[ne.cursor] = '_'; } return;
+    }
+    if (k === ' ' || k === 'enter') { submitNameEntry(); return; }
+    return;
+  }
+  if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
   if ((k === ' ') && state.phase === 'lobby') { startCountdown(); return; }
   if (state.phase !== 'playing') return;
   if (k === 'a') onTap(1);
@@ -965,10 +1005,19 @@ function goToCharSelect() {
   state.p2Cursor = state.p2Icon;
   state.phase = 'charSelect';
 }
+function submitNameEntry() {
+  const ne = nameEntryState;
+  const name = ne.letters.filter(l => l !== '_').join('') || 'ANON';
+  addLBEntry(name, ne.winner === 1 ? state.p1Icon : state.p2Icon, ne.spamCount, ne.spamRate);
+  lbNewName = name;
+  state.phase = 'leaderboard';
+}
 
 _canvas.addEventListener('click', e => {
   const { mx, my } = canvasCoords(e);
   if (state.phase !== 'charSelect' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
+  if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; return; }
+  if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; return; }
   if (state.phase === 'lobby') startCountdown();
 });
 _canvas.addEventListener('mousemove', e => {
@@ -993,10 +1042,13 @@ function onTap(player) {
   // Speed boost effect
   const speedMult = (puEffects[idx].id === 'speed' && puEffects[idx].timer > 0) ? 1.6 : 1;
   const step = TAP_STEP * (1 + rhythmBonus[idx] * 0.6) * speedMult;
-  if (player === 1) state.balance = Math.min( 1, state.balance + step);
-  else              state.balance = Math.max(-1, state.balance - step);
+  const oppIdx = 1 - idx;
+  const reversed = puEffects[oppIdx].id === 'reverse' && puEffects[oppIdx].timer > 0;
+  if (player === 1) state.balance = reversed ? Math.max(-1, state.balance - step) : Math.min( 1, state.balance + step);
+  else              state.balance = reversed ? Math.min( 1, state.balance + step) : Math.max(-1, state.balance - step);
   state.tapFlash[player-1] = 0.18;
   state.tapCount[player-1]++;
+  state.totalTaps[player-1]++;
   recordTap(player);
   // Combo floating text
   const now = performance.now();
@@ -1018,6 +1070,11 @@ function onTap(player) {
 
 // ── Game logic ────────────────────────────────────────────────────────────────
 function tickGame(dt) {
+  // Accumulate each player's personal active time (excludes freeze)
+  for (let idx = 0; idx < 2; idx++) {
+    if (!(puEffects[idx].id === 'freeze' && puEffects[idx].timer > 0))
+      state.timeActive[idx] += dt;
+  }
   // Option E: tug zones — drift gets stronger past the 50% mark (comeback mechanic)
   const absBal   = Math.abs(state.balance);
   const tugBoost = absBal > 0.5 ? 1 + (absBal - 0.5) * 3.5 : 1;
@@ -1028,10 +1085,8 @@ function tickGame(dt) {
   const idleBoost   = sinceAnyTap > 250 ? 1 + Math.min(4, (sinceAnyTap - 250) / 200) : 1;
 
   const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
-  const shieldP1 = puEffects[0].id === 'shield' && puEffects[0].timer > 0;
-  const shieldP2 = puEffects[1].id === 'shield' && puEffects[1].timer > 0;
-  if      (state.balance > 0 && !shieldP1) state.balance = Math.max(0, state.balance - drift);
-  else if (state.balance < 0 && !shieldP2) state.balance = Math.min(0, state.balance + drift);
+  if      (state.balance > 0) state.balance = Math.max(0, state.balance - drift);
+  else if (state.balance < 0) state.balance = Math.min(0, state.balance + drift);
   tickPowerUp(dt);
   tickComboTexts(dt);
   tickPuTexts(dt);
@@ -1072,7 +1127,15 @@ function drawRound() {
 }
 function nextRound() {
   if (state.scores[0] >= 2 || state.scores[1] >= 2 || state.round >= 3) {
-    state.phase = 'gameOver';
+    const w = state.scores[0] > state.scores[1] ? 1 : state.scores[1] > state.scores[0] ? 2 : 0;
+    if (w > 0) {
+      const taps = state.totalTaps[w - 1];
+      const rate = state.timeActive[w - 1] > 0 ? (taps / state.timeActive[w - 1]).toFixed(1) : '0.0';
+      nameEntryState = { letters: ['_','_','_','_','_','_','_','_','_','_'], cursor: 0, winner: w, spamCount: taps, spamRate: rate };
+      state.phase = 'nameEntry';
+    } else {
+      state.phase = 'gameOver';
+    }
   } else {
     state.round++; state.balance = 0; state.tapCount = [0,0];
     state.roundTimer = ROUND_TIME;
@@ -1103,7 +1166,10 @@ function loop(ts) {
     }
     if (bootLineShown >= BOOT_LINES.length) {
       bootDoneTimer += dt;
-      if (bootDoneTimer > 1.0) state.phase = 'charSelect';
+      if (bootDoneTimer > 1.0) {
+        howToPlayFrom = 'charSelect';
+        state.phase = localStorage.getItem('spamwars_seen_howto') ? 'charSelect' : 'howToPlay';
+      }
     }
   } else if (state.phase === 'lobby') {
     tickParticles(dt); tickShake(dt); tickFlash(dt);
@@ -1126,7 +1192,7 @@ function loop(ts) {
     tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt);
     state.reTimer -= dt;
     if (state.reTimer <= 0) nextRound();
-  } else if (state.phase === 'gameOver') {
+  } else if (state.phase === 'gameOver' || state.phase === 'nameEntry' || state.phase === 'leaderboard') {
     tickParticles(dt); tickFlash(dt);
   }
   draw();
@@ -1224,9 +1290,9 @@ function drawScore() {
   // Player labels
   ctx.font = '13px "Press Start 2P", monospace';
   ctx.save(); ctx.shadowColor = P1C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P1C(); glowTxt('P1', cx - 155, 26); ctx.restore();
+  ctx.fillStyle = P1C(); glowTxt('P1', cx - 155, 38); ctx.restore();
   ctx.save(); ctx.shadowColor = P2C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P2C(); glowTxt('P2', cx + 155, 26); ctx.restore();
+  ctx.fillStyle = P2C(); glowTxt('P2', cx + 155, 38); ctx.restore();
 
   // Score numbers — fire gradient + glow
   ctx.save();
@@ -1653,41 +1719,40 @@ function drawWinCelebration() {
   const alienIdx = w === 1 ? state.p1Icon : state.p2Icon;
   const col      = w === 1 ? P1C() : P2C();
   const t        = performance.now() * 0.001;
-  const elapsed  = 3.2 - state.reTimer;  // 0 → 3.2 as round-end plays out
+  const elapsed  = 3.2 - state.reTimer;
   const cx = W / 2, cy = H / 2 + 62;
+
+  // Smoothstep: smooth S-curve 0→1
+  function smoothstep(p) { return p * p * (3 - 2 * p); }
 
   let finalX = cx, finalY = cy, finalRot = 0, finalSX = 1, finalSY = 1, glow = 36;
 
   if (elapsed < 0.55) {
-    // Phase 1: spin-in + drop from above (0 → 0.55s)
-    const p  = elapsed / 0.55;                           // 0..1
-    const ep = 1 - Math.pow(1 - p, 3);                   // ease-out cubic
-    // Overshoot scale: grows past 1 then settles
-    const sc = p < 0.75
-      ? ep * 1.35
-      : 1.35 - (p - 0.75) / 0.25 * 0.35;
-    finalRot = (1 - ep) * Math.PI * 2.5;                 // 2.5 full spins → 0
-    finalSX  = sc; finalSY = sc;
-    finalY   = cy - (1 - ep) * 70;                       // drop in from above
-    glow     = 55 + ep * 20;
-  } else if (elapsed < 1.3) {
-    // Phase 2: rapid victory hops (0.55 → 1.3s)
-    // Use 3 full hops (integer) so sin(3π)=0 and alien lands cleanly at cy on exit
-    const p   = (elapsed - 0.55) / 0.75;
-    const hop = -Math.abs(Math.sin(p * Math.PI * 3)) * 22;
-    const sc  =  1 + Math.abs(Math.sin(p * Math.PI * 3)) * 0.12;
-    finalY   = cy + hop;
-    finalSX  = sc * (1 - Math.abs(Math.sin(p * Math.PI * 3)) * 0.08);
-    finalSY  = sc;
-    glow     = 48;
+    // Phase 1: smooth pop-in + decelerate-spin + drop from above (0 → 0.55s)
+    const p   = elapsed / 0.55;
+    const ep  = 1 - Math.pow(1 - p, 3); // ease-out cubic — grows smoothly to 1, no snap
+    finalSX   = ep;
+    finalSY   = ep;
+    finalRot  = (1 - ep) * (1 - ep) * Math.PI * 2.5;  // decelerating spin → 0
+    glow      = 40 + ep * 35;
+  } else if (elapsed < 1.4) {
+    // Phase 2: victory hops with squash & stretch (0.55 → 1.4s)
+    // 3 integer hops so sin(3π)=0 — alien lands cleanly at cy on exit
+    const p    = (elapsed - 0.55) / 0.85;
+    const wave = Math.abs(Math.sin(p * Math.PI * 3));
+    finalY     = cy - wave * 22;
+    finalSX    = 1 + wave * 0.10;   // stretch wide at peak
+    finalSY    = 1 + wave * 0.15;   // stretch tall at peak
+    glow       = 44;
   } else {
-    // Phase 3: blend into alien's own animation over 0.4s so there's no hard cut
-    const blend = Math.min(1, (elapsed - 1.3) / 0.4); // 0→1 over 0.4s
+    // Phase 3: smoothly blend into idle alien animation (1.4s → 1.9s)
+    const blend = smoothstep(Math.min(1, (elapsed - 1.4) / 0.5));
     const { dx, dy, sx, sy, rot } = alienAnim(alienIdx, t);
-    finalX   = cx + dx * 2.2 * blend;
-    finalY   = cy + dy * 2.2 * blend; // starts at cy (same as phase-2 landing), eases into animation
+    finalX  = cx + dx * 2.2 * blend;
+    finalY  = cy + dy * 2.2 * blend;
     finalRot = rot * blend;
-    finalSX  = sx; finalSY = sy;
+    finalSX  = 1 + (sx - 1) * blend;  // lerp from 1 so scale is continuous
+    finalSY  = 1 + (sy - 1) * blend;
     glow     = 38;
   }
 
@@ -1698,6 +1763,7 @@ function drawWinCelebration() {
   ctx.scale(finalSX, finalSY);
   drawAlienSprite(alienIdx, 0, 0, 7);
   ctx.restore();
+
 }
 
 // ── Draw: character select ────────────────────────────────────────────────────
@@ -1823,7 +1889,286 @@ function drawCharSelect() {
   ctx.font = '7px "Press Start 2P", monospace';
   ctx.shadowColor = '#ffee00'; ctx.shadowBlur = blinkOn ? 14 : 0;
   ctx.fillStyle = blinkOn ? '#ffee00' : 'rgba(255,238,0,0.15)';
-  txt('PRESS SPACE TO CONFIRM', W / 2, GRID_Y + GRID_H + 26);
+  txt(isMobile ? 'TAP BOTTOM TO CONFIRM' : 'PRESS SPACE TO CONFIRM', W / 2, GRID_Y + GRID_H + 26);
+  ctx.restore();
+}
+
+// ── Draw: name entry ──────────────────────────────────────────────────────────
+function drawNameEntry() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.88)'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W / 2;
+  const ne = nameEntryState;
+  const winCol = ne.winner === 1 ? P1C() : P2C();
+
+  // Title
+  ctx.font = '11px "Press Start 2P", monospace';
+  ctx.fillStyle = winCol; ctx.shadowColor = winCol; ctx.shadowBlur = 20;
+  ctx.fillText(`PLAYER ${ne.winner} WINS!`, cx, 58);
+  ctx.shadowBlur = 0;
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('ENTER YOUR NAME', cx, 86);
+
+  // Single text-field box (10 chars)
+  const FIELD_W = 400, FIELD_H = 44, FIELD_Y = 108;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(cx - FIELD_W/2, FIELD_Y, FIELD_W, FIELD_H);
+  ctx.fillStyle = 'rgba(255,255,255,0.04)'; ctx.fill();
+  ctx.strokeStyle = winCol; ctx.lineWidth = 1.5;
+  ctx.shadowColor = winCol; ctx.shadowBlur = 10;
+  ctx.stroke();
+  ctx.restore();
+
+  // Render characters centered — only filled slots + cursor, growing outward from center
+  ctx.font = '16px "Press Start 2P", monospace';
+  ctx.textBaseline = 'middle';
+  const charW = ctx.measureText('A').width + 4;
+  const blinkOn = (performance.now() % 900) < 520;
+  const visibleCount = ne.cursor + 1; // filled chars + cursor slot
+  const tx0 = cx - (visibleCount * charW) / 2;
+  const ty = FIELD_Y + FIELD_H / 2;
+
+  for (let i = 0; i < visibleCount; i++) {
+    const tx = tx0 + i * charW;
+    const letter = ne.letters[i];
+    const isCursor = i === ne.cursor;
+
+    if (isCursor && blinkOn) {
+      ctx.fillStyle = winCol; ctx.shadowColor = winCol; ctx.shadowBlur = 10;
+      ctx.fillText('|', tx + charW * 0.1, ty);
+      ctx.shadowBlur = 0;
+    } else if (letter !== '_') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(letter, tx, ty);
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillText('_', tx, ty);
+    }
+  }
+
+  // Spam stats
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = '6px "Press Start 2P", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText(`${ne.spamCount ?? 0} TAPS  ·  ${ne.spamRate ?? '0.0'}/s`, cx, 174);
+
+  // Controls hint
+  ctx.font = '5px "Press Start 2P", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText(isMobile ? 'TAP RIGHT = NEXT LETTER  ·  LEFT = BACK  ·  BOTTOM = DONE' : 'TYPE YOUR NAME  ·  ENTER TO CONFIRM', cx, 192);
+
+  // Mobile confirm hint
+  if (isMobile) {
+    const blinkC = (performance.now() % 1100) < 660;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = blinkC ? 'rgba(255,238,0,0.6)' : 'rgba(255,238,0,0.15)';
+    ctx.shadowColor = '#ffee00'; ctx.shadowBlur = blinkC ? 10 : 0;
+    ctx.fillText('▼  CONFIRM', cx, H - 26);
+    ctx.shadowBlur = 0;
+  }
+  ctx.restore();
+}
+
+// ── Draw: leaderboard ─────────────────────────────────────────────────────────
+function drawLeaderboard() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.92)'; ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const cx = W / 2;
+
+  // Title
+  ctx.font = '13px "Press Start 2P", monospace';
+  ctx.fillStyle = '#ffee00'; ctx.shadowColor = '#ffee00'; ctx.shadowBlur = 20;
+  ctx.fillText('★  LEADERBOARD  ★', cx, 30);
+  ctx.shadowBlur = 0;
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,238,0,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(60, 48); ctx.lineTo(W - 60, 48); ctx.stroke();
+
+  // Column headers
+  ctx.font = '5px "Press Start 2P", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.textAlign = 'left';  ctx.fillText('RANK',  90,  62);
+  ctx.textAlign = 'left';  ctx.fillText('NAME',  220, 62);
+  ctx.textAlign = 'right'; ctx.fillText('WINS',  430, 62);
+  ctx.textAlign = 'right'; ctx.fillText('TAPS',  530, 62);
+  ctx.textAlign = 'right'; ctx.fillText('RATE',  630, 62);
+  ctx.textAlign = 'right'; ctx.fillText('DATE',  730, 62);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.beginPath(); ctx.moveTo(60, 70); ctx.lineTo(W - 60, 70); ctx.stroke();
+
+  const lb = getLB();
+  const RANKS = ['1ST','2ND','3RD','4TH','5TH','6TH','7TH','8TH','9TH','10TH'];
+  const RANK_COLS = ['#ffd700','#c0c0c0','#cd7f32'];
+  const ROW_H = 26;
+  const startY = 84;
+
+  if (lb.length === 0) {
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.textAlign = 'center';
+    ctx.fillText('NO SCORES YET', cx, startY + 60);
+    ctx.fillText('PLAY A MATCH TO ENTER!', cx, startY + 86);
+  }
+
+  for (let i = 0; i < lb.length; i++) {
+    const e   = lb[i];
+    const y   = startY + i * ROW_H;
+    const col = i < 3 ? RANK_COLS[i] : 'rgba(255,255,255,0.55)';
+    const isNew = e.name === lbNewName && i === lb.findIndex(x => x.name === lbNewName);
+    const blinkOn = isNew && (performance.now() % 800) < 480;
+
+    // Row highlight for new entry
+    if (isNew) {
+      ctx.save();
+      ctx.fillStyle = blinkOn ? 'rgba(255,238,0,0.07)' : 'transparent';
+      ctx.fillRect(60, y - 10, W - 120, ROW_H);
+      ctx.restore();
+    }
+
+    // Rank
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = isNew && blinkOn ? '#ffee00' : col;
+    if (i < 3) { ctx.shadowColor = col; ctx.shadowBlur = 8; }
+    ctx.textAlign = 'left'; ctx.fillText(RANKS[i], 90, y + 3);
+    ctx.shadowBlur = 0;
+
+    // Alien sprite
+    drawAlienSprite(e.icon ?? 0, 175, y + 3, 2);
+
+    // Name
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillStyle = isNew && blinkOn ? '#ffee00' : (i < 3 ? col : '#ffffff');
+    if (i < 3) { ctx.shadowColor = col; ctx.shadowBlur = 6; }
+    ctx.textAlign = 'left'; ctx.fillText(e.name, 220, y + 3);
+    ctx.shadowBlur = 0;
+
+    // Wins
+    ctx.font = '7px "Press Start 2P", monospace';
+    ctx.fillStyle = i < 3 ? col : 'rgba(255,255,255,0.7)';
+    ctx.textAlign = 'right'; ctx.fillText(e.wins, 430, y + 3);
+
+    // Taps
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'right'; ctx.fillText(e.spamCount ?? '-', 530, y + 3);
+
+    // Rate
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.textAlign = 'right'; ctx.fillText(e.spamRate ? `${e.spamRate}/s` : '-', 630, y + 3);
+
+    // Date
+    ctx.font = '5px "Press Start 2P", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.textAlign = 'right'; ctx.fillText(e.date ?? '', 730, y + 3);
+  }
+
+  // Bottom divider + prompt
+  const tableBottom = startY + Math.max(lb.length, 1) * ROW_H + 8;
+  ctx.strokeStyle = 'rgba(255,238,0,0.3)';
+  ctx.beginPath(); ctx.moveTo(60, tableBottom); ctx.lineTo(W - 60, tableBottom); ctx.stroke();
+
+  const blinkP = (performance.now() % 1100) < 660;
+  ctx.font = '6px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#ffee00'; ctx.shadowBlur = blinkP ? 12 : 0;
+  ctx.fillStyle = blinkP ? '#ffee00' : 'rgba(255,238,0,0.2)';
+  ctx.fillText(isMobile ? 'TAP TO CONTINUE' : 'PRESS ANY KEY TO CONTINUE', cx, tableBottom + 18);
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+// ── Draw: how to play ─────────────────────────────────────────────────────────
+function drawHowToPlay() {
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+
+  const cx = W / 2;
+  const rowData = [
+    { color: '#cc66ff', label: 'PLAYER 1',  hint: isMobile ? 'TAP LEFT SIDE'  : 'A / S  KEYS' },
+    { color: '#ff4499', label: 'PLAYER 2',  hint: isMobile ? 'TAP RIGHT SIDE' : 'K / L  KEYS' },
+    { color: '#ffffff', label: 'GOAL',      hint: 'PUSH ORB TO OPPONENT SIDE' },
+    { color: '#ffffff', label: 'WIN',       hint: 'FIRST TO WIN 2 ROUNDS' },
+  ];
+  const puData = [
+    { color: '#ffee00', label: 'SPD', hint: 'YOUR TAPS MOVE FASTER' },
+    { color: '#ff4444', label: 'REV', hint: "OPP TAPS BACKFIRE ON THEM" },
+    { color: '#88ffee', label: 'FRZ', hint: 'OPPONENT FROZEN BRIEFLY' },
+  ];
+
+  // Vertically center the whole block
+  const TITLE_H = 14, ROW_SPACING = 20, PU_SPACING = 17, PROMPT_H = 10;
+  const blockH = TITLE_H + 14 + 1 + 12
+               + rowData.length * ROW_SPACING + 10
+               + 8 + puData.length * PU_SPACING
+               + 12 + 1 + 12 + PROMPT_H;
+  let y = Math.round((H - blockH) / 2);
+
+  // Title
+  ctx.font = '14px "Press Start 2P", monospace';
+  ctx.fillStyle = '#ffee00'; ctx.shadowColor = '#ffee00'; ctx.shadowBlur = 18;
+  ctx.fillText('HOW TO PLAY', cx, y + TITLE_H / 2);
+  ctx.shadowBlur = 0;
+  y += TITLE_H + 14;
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,238,0,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(80, y); ctx.lineTo(W - 80, y); ctx.stroke();
+  y += 1 + 12;
+
+  // Main rows
+  for (const r of rowData) {
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.shadowColor = r.color; ctx.shadowBlur = 8;
+    ctx.fillStyle = r.color; ctx.textAlign = 'right';
+    ctx.fillText(r.label, cx - 12, y + 6);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.textAlign = 'left';
+    ctx.fillText(r.hint, cx + 12, y + 6);
+    y += ROW_SPACING;
+  }
+  y += 10;
+
+  // Power-ups sub-header
+  ctx.font = '5px "Press Start 2P", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.textAlign = 'center';
+  ctx.fillText('— POWER-UPS —', cx, y + 4);
+  y += 8 + 8;
+
+  // Power-up rows
+  for (const p of puData) {
+    // Colored dot indicator
+    ctx.fillStyle = p.color; ctx.shadowColor = p.color; ctx.shadowBlur = 8;
+    ctx.fillRect(cx - 60, y, 4, 4);
+    ctx.shadowBlur = 0;
+    ctx.font = '6px "Press Start 2P", monospace';
+    ctx.fillStyle = p.color; ctx.textAlign = 'left';
+    ctx.fillText(p.label, cx - 52, y + 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.fillText(p.hint, cx - 20, y + 4);
+    y += PU_SPACING;
+  }
+  y += 12;
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,238,0,0.3)';
+  ctx.beginPath(); ctx.moveTo(80, y); ctx.lineTo(W - 80, y); ctx.stroke();
+  y += 1 + 12;
+
+  // Blink prompt
+  const blinkOn = (performance.now() % 1100) < 660;
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#ffee00'; ctx.shadowBlur = blinkOn ? 14 : 0;
+  ctx.fillStyle = blinkOn ? '#ffee00' : 'rgba(255,238,0,0.15)';
+  ctx.fillText(isMobile ? 'TAP TO CONTINUE' : 'PRESS SPACE TO CONTINUE', cx, y + PROMPT_H / 2);
   ctx.restore();
 }
 
@@ -1861,10 +2206,30 @@ function drawLobby() {
     ctx.fillText(`P2 WINS: ${w2}`, W / 2 + 10, wy);
     ctx.restore();
   }
+
+  // "HOW TO PLAY" + "HIGH SCORES" buttons side by side at top center
+  ctx.save();
+  ctx.font = '5px "Press Start 2P", monospace';
+  const PAD2 = 14, GAP2 = 10;
+  const hwW = ctx.measureText('HOW TO PLAY').width  + PAD2;
+  const hsW = ctx.measureText('LEADERBOARD').width + PAD2;
+  const totalBtnW = hwW + GAP2 + hsW;
+  HOW_BTN.x = W/2 - totalBtnW/2; HOW_BTN.w = hwW;
+  HS_BTN.x  = HOW_BTN.x + hwW + GAP2; HS_BTN.w = hsW;
+  for (const [btn, label] of [[HOW_BTN,'HOW TO PLAY'],[HS_BTN,'LEADERBOARD']]) {
+    ctx.beginPath(); ctx.rect(btn.x, btn.y, btn.w, btn.h);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, btn.x + btn.w/2, btn.y + btn.h/2);
+  }
+  ctx.restore();
 }
 
 // ── Draw: change players button (top-left) ────────────────────────────────────
 const CHANGE_BTN = { x: 8, y: 8, w: 0, h: 16 }; // w set dynamically
+const ESC_BTN    = { x: 0, y: 8, w: 0, h: 16 }; // x/w set dynamically
 let changeHover = false;
 
 function drawChangeBtn() {
@@ -1891,10 +2256,11 @@ function drawChangeBtn() {
 function drawEscHint() {
   const PAD = 8, by = 8, bh = 16;
   ctx.font = '6px "Press Start 2P", monospace';
-  const label = 'ESC to Restart';
+  const label = isMobile ? 'TAP to Restart' : 'ESC to Restart';
   const tw = ctx.measureText(label).width;
   const bw = tw + PAD * 2;
   const bx = W - bw - 8;
+  ESC_BTN.x = bx; ESC_BTN.w = bw; // keep in sync for hit-testing
   ctx.save();
   ctx.beginPath(); ctx.rect(bx, by, bw, bh);
   ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fill();
@@ -1928,6 +2294,24 @@ function draw() {
 
   drawBg();
 
+  if (state.phase === 'howToPlay') {
+    drawHowToPlay();
+    ctx.restore();
+    return;
+  }
+
+  if (state.phase === 'nameEntry') {
+    drawNameEntry();
+    ctx.restore();
+    return;
+  }
+
+  if (state.phase === 'leaderboard') {
+    drawLeaderboard();
+    ctx.restore();
+    return;
+  }
+
   if (state.phase === 'charSelect') {
     drawCharSelect();
     drawScreenFlash();
@@ -1954,7 +2338,15 @@ function draw() {
       const matchWon = ws >= 2;
       drawOverlay(col,
         matchWon ? `Player ${state.roundWinner} wins!` : `Player ${state.roundWinner} wins the round!`,
-        matchWon ? `${state.scores[0]} – ${state.scores[1]}` : '');
+        '');
+      // Score between title (y≈188) and alien (y≈272)
+      ctx.save();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = '10px "Press Start 2P", monospace';
+      ctx.shadowColor = col; ctx.shadowBlur = 10;
+      ctx.fillStyle = '#ffcc44';
+      ctx.fillText(`${state.scores[0]}  –  ${state.scores[1]}`, W / 2, H / 2 + 14);
+      ctx.restore();
       drawWinCelebration();
     }
   }
@@ -2035,7 +2427,12 @@ function draw() {
 // ── Mobile scaling ────────────────────────────────────────────────────────────
 // Directly set CSS properties on each element so canvas scales correctly in Safari iOS
 function applyMobileScale() {
-  const s = Math.min(1, (window.innerWidth - 8) / 892);
+  // Cap scale by both width (892px design) and height (~590px total content height)
+  // Use visualViewport.height for accurate height on iOS (excludes browser chrome)
+  const vh = (window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const sW = (window.innerWidth - 8) / 892;
+  const sH = (vh - 8) / 590;
+  const s  = Math.min(1, sW, sH);
   if (s >= 1) return;
   // Scale canvas display size (internal resolution/drawing coords unchanged)
   canvas.style.width  = Math.floor(W * s) + 'px';
@@ -2044,13 +2441,56 @@ function applyMobileScale() {
   const bezel = document.getElementById('crt-bezel');
   bezel.style.padding      = `${Math.round(30*s)}px ${Math.round(36*s)}px ${Math.round(40*s)}px ${Math.round(36*s)}px`;
   bezel.style.borderRadius = `${Math.round(60*s)}px`;
-  // Scale title font
-  document.getElementById('title').style.fontSize = (3 * s) + 'rem';
-  // Scale ticker width
-  document.getElementById('ticker').style.width = Math.floor(892 * s) + 'px';
+  // Scale title, tagline, and content gap
+  document.getElementById('title').style.fontSize   = (3    * s) + 'rem';
+  document.getElementById('tagline').style.fontSize = (0.45 * s) + 'rem';
+  document.getElementById('content').style.gap      = Math.round(10 * s) + 'px';
+  // Scale ticker width and font size
+  document.getElementById('ticker').style.width    = Math.floor(892 * s) + 'px';
+  document.getElementById('ticker').style.fontSize = (0.42 * s) + 'rem';
+  // Scale .crt-screw divs (top-right and bottom-left)
+  const sz = Math.round(14 * s);
+  const screws = document.querySelectorAll('.crt-screw');
+  if (screws[0]) {
+    screws[0].style.width  = sz + 'px'; screws[0].style.height = sz + 'px';
+    screws[0].style.top    = Math.round(18 * s) + 'px';
+    screws[0].style.right  = Math.round(26 * s) + 'px';
+  }
+  if (screws[1]) {
+    screws[1].style.width  = sz + 'px'; screws[1].style.height = sz + 'px';
+    screws[1].style.bottom = Math.round(22 * s) + 'px';
+    screws[1].style.left   = Math.round(22 * s) + 'px';
+  }
+  // Scale ::before / ::after pseudo-element screws (top-left and bottom-right)
+  let st = document.getElementById('screw-scale-style');
+  if (!st) { st = document.createElement('style'); st.id = 'screw-scale-style'; document.head.appendChild(st); }
+  st.textContent = `
+    #crt-bezel::before, #crt-bezel::after { width:${sz}px; height:${sz}px; }
+    #crt-bezel::before { top:${Math.round(18*s)}px; left:${Math.round(22*s)}px; }
+    #crt-bezel::after  { bottom:${Math.round(22*s)}px; right:${Math.round(26*s)}px; }
+  `;
 }
 applyMobileScale();
 window.addEventListener('resize', applyMobileScale);
+if (window.visualViewport) window.visualViewport.addEventListener('resize', applyMobileScale);
+
+// Fullscreen on landscape rotation (mobile)
+function tryFullscreen() {
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (req) req.call(el).catch(() => {});
+}
+function tryExitFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) exit.call(document).catch(() => {});
+}
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (Math.abs(window.orientation ?? 0) === 90) tryFullscreen();
+    else tryExitFullscreen();
+    applyMobileScale();
+  }, 350);
+});
 
 // ── Touch input (mobile) ──────────────────────────────────────────────────────
 const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
@@ -2058,17 +2498,58 @@ const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 _canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   for (const touch of e.changedTouches) {
-    // Use physical screen midpoint of the canvas to avoid zoom coordinate issues
     const r = _canvas.getBoundingClientRect();
+    const mx = (touch.clientX - r.left) * (W / r.width);
+    const my = (touch.clientY - r.top)  * (H / r.height);
+    // Check overlay buttons first (work in any phase)
+    if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; continue; }
+    if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; continue; }
+    if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); continue; }
+    if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && inRect(mx, my, ESC_BTN)) {
+      const i1 = state.p1Icon, i2 = state.p2Icon;
+      if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
+      initState(); state.p1Icon = i1; state.p2Icon = i2;
+      state.p1Cursor = i1; state.p2Cursor = i2; state.phase = 'lobby'; continue;
+    }
     const midX = r.left + r.width / 2;
     const isLeft = touch.clientX < midX;
-    if (state.phase === 'playing') {
+    if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
+    if (state.phase === 'nameEntry') {
+      const ne = nameEntryState;
+      const ALPHA_FULL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      if (my > H - 60) { // bottom confirm strip
+        submitNameEntry();
+      } else if (isLeft) {
+        // left tap = go back one cursor position
+        if (ne.cursor > 0) { ne.cursor--; }
+      } else {
+        // right tap = cycle current letter forward, then advance cursor
+        const cur = ne.letters[ne.cursor] === '_' ? -1 : ALPHA_FULL.indexOf(ne.letters[ne.cursor]);
+        ne.letters[ne.cursor] = ALPHA_FULL[(cur + 1) % ALPHA_FULL.length];
+        if (ne.cursor < 9) ne.cursor++;
+        else submitNameEntry();
+      }
+      continue;
+    }
+    if (state.phase === 'howToPlay') {
+      localStorage.setItem('spamwars_seen_howto', '1'); state.phase = howToPlayFrom; continue;
+    } else if (state.phase === 'playing') {
       if (isLeft) onTap(1); else onTap(2);
     } else if (state.phase === 'lobby') {
       startCountdown();
     } else if (state.phase === 'charSelect') {
-      if (isLeft) state.p1Cursor = (state.p1Cursor + 1) % 16;
-      else        state.p2Cursor = (state.p2Cursor + 1) % 16;
+      const cr = _canvas.getBoundingClientRect();
+      const tmy = (touch.clientY - cr.top) * (H / cr.height);
+      const tmx = (touch.clientX - cr.left) * (W / cr.width);
+      const csGridY = Math.round((H - 272) / 2) + 10;
+      if (tmy > csGridY + 272 - 10) {
+        // tap in bottom confirm strip → confirm selection
+        state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby';
+      } else if (tmx < W / 2) {
+        state.p1Cursor = (state.p1Cursor + 1) % 16;
+      } else {
+        state.p2Cursor = (state.p2Cursor + 1) % 16;
+      }
     } else if (state.phase === 'gameOver') {
       const i1 = state.p1Icon, i2 = state.p2Icon;
       initState();
