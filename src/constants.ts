@@ -1,0 +1,17 @@
+export const BAR_Y = 248;
+export const BAR_CX = 410;
+export const BAR_HALF = 180;
+export const BAR_H = 30;
+export const ORB_R = 19;
+export const TIMER_CY = BAR_Y - 72;
+export const TAP_STEP = 0.068;
+export const DRIFT_SPD = 0.10;
+export const ROUND_TIME = 30;
+export const METER_SEGS = 12;
+export const METER_H = 188;
+export const METER_W = 16;
+export const METER_GAP = 3;
+export const SEG_H = (METER_H - (METER_SEGS - 1) * METER_GAP) / METER_SEGS;
+export const LOBBY_BTN = { x: 310, y: 154, w: 200, h: 44 };
+export const HOW_BTN   = { x: 335, y: 8,   w: 70,  h: 22 };
+export const HS_BTN    = { x: 415, y: 8,   w: 90,  h: 22 };
