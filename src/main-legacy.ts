@@ -4,6 +4,7 @@ import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
          LOBBY_BTN, HOW_BTN, HS_BTN } from './constants.ts';
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
 import { storage } from './storage/StorageManager.ts';
+import { GameState, initGameState, cloneGameState } from './state/GameState.ts';
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
@@ -597,18 +598,10 @@ function drawEffectHud() {
 }
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let state;
+let state: GameState = initGameState();
 function initState() {
-  state = {
-    balance: 0,
-    scores: [0, 0], round: 1,
-    phase: 'boot', countdown: 3, cdTimer: 1.0, cdScale: 1.6,
-    reTimer: 0, roundWinner: null,
-    roundTimer: ROUND_TIME,
-    tapFlash: [0, 0], tapCount: [0, 0], totalTaps: [0, 0], timeActive: [0, 0],
-    p1Icon: 0, p2Icon: 8,
-    p1Cursor: 0, p2Cursor: 8,
-  };
+  state = initGameState();
+  state.cdTimer = 1.0; state.cdScale = 1.6;
   particles.length = orbTrail.length = 0;
   orbBounce = orbVelX = coinAngle = orbitAngle = shakeAmt = flashAlpha = 0;
   scoreScale = [1, 1];
