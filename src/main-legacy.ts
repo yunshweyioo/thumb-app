@@ -5,10 +5,7 @@ import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
 import { storage } from './storage/StorageManager.ts';
 import { GameState, initGameState, cloneGameState } from './state/GameState.ts';
-
-// ── Colors ────────────────────────────────────────────────────────────────────
-function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
-function P2C() { return ALIENS[state ? state.p2Icon : 8].c; }
+import { SHAPES, ALIENS, getAlienColor, alienAnim, drawAlienSprite } from './sprites/AlienSprites.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -146,7 +143,7 @@ function stopPinTone() {
 // ── Particles ─────────────────────────────────────────────────────────────────
 const particles = [];
 function burst(player, orbX, big) {
-  const color = player === 1 ? P1C() : P2C();
+  const color = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
   const count = big ? 32 : 12;
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 / count) * i + Math.random() * 0.7;
@@ -272,7 +269,7 @@ function tickMeters(dt) {
 function drawMeter(player) {
   const isP1 = player === 1;
   const mx   = isP1 ? 26 : W - 26;
-  const col  = isP1 ? P1C() : P2C();
+  const col  = isP1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
   const lv   = meterLevel[player - 1];
   const topY = BAR_Y - METER_H / 2;
   const PAD  = 4; // casing padding
@@ -326,105 +323,6 @@ function drawMeter(player) {
 
 // ── Pixel-art alien sprites ────────────────────────────────────────────────
 // 0=empty  1=body  2=eye accent
-const SHAPES = [
-  // 0: Classic wide crab (11×8)
-  [[0,0,1,0,0,0,0,0,1,0,0],
-   [0,0,0,1,0,0,0,1,0,0,0],
-   [0,0,1,1,1,1,1,1,1,0,0],
-   [0,1,1,2,1,1,1,2,1,1,0],
-   [1,1,1,1,1,1,1,1,1,1,1],
-   [1,0,1,1,1,1,1,1,1,0,1],
-   [1,0,1,0,0,0,0,0,1,0,1],
-   [0,0,0,1,1,0,1,1,0,0,0]],
-  // 1: Tall insect (9×8)
-  [[0,0,0,1,0,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,2,1,1,1,2,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,0,1,1,1,1,1,0,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 2: Round blob/ghost (9×8)
-  [[0,0,0,1,1,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,2,1,1,1,2,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,1,1,1,1,1,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 3: Spider with legs (9×8)
-  [[1,0,0,0,1,0,0,0,1],
-   [0,1,0,1,1,1,0,1,0],
-   [0,0,1,2,1,2,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,0,1,0,1,1,0],
-   [0,0,0,1,0,1,0,0,0],
-   [0,0,1,0,0,0,1,0,0]],
-];
-
-const ALIENS = [
-  {s:0,c:'#8833cc',e:'#ff5555'}, // 0  purple crab
-  {s:1,c:'#aacc33',e:'#ffee00'}, // 1  yellow-green insect
-  {s:2,c:'#ff44aa',e:'#ffff44'}, // 2  pink blob
-  {s:3,c:'#ffaa00',e:'#8833cc'}, // 3  orange spider
-  {s:0,c:'#33ccbb',e:'#8833cc'}, // 4  teal crab
-  {s:1,c:'#cc33cc',e:'#ffee00'}, // 5  magenta insect
-  {s:2,c:'#ffee00',e:'#aa33cc'}, // 6  yellow blob
-  {s:3,c:'#ff5500',e:'#ffff44'}, // 7  orange-red spider
-  {s:0,c:'#ff2266',e:'#ffff44'}, // 8  hot-pink crab
-  {s:1,c:'#66cc22',e:'#cc44cc'}, // 9  green insect
-  {s:2,c:'#4466ee',e:'#ffaa00'}, // 10 blue blob
-  {s:3,c:'#44cccc',e:'#884499'}, // 11 teal spider
-  {s:0,c:'#6644bb',e:'#ff4444'}, // 12 blue-purple crab
-  {s:1,c:'#ee4411',e:'#ffee00'}, // 13 orange-red insect
-  {s:2,c:'#ccee22',e:'#884499'}, // 14 yellow-green blob
-  {s:3,c:'#44aa44',e:'#ffee00'}, // 15 green spider
-];
-
-// ── Per-alien select animation ─────────────────────────────────────────────────
-// Returns {dx, dy, sx, sy, rot} canvas transforms for the selected sprite
-function alienAnim(i, t) {
-  const s = Math.sin, c = Math.cos, abs = Math.abs;
-  switch (i) {
-    case  0: return { dx: s(t*4)*6,            dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: scuttle L/R
-    case  1: return { dx: 0,                   dy: -abs(s(t*5))*9,      sx: 1,                    sy: 1,           rot: 0             }; // insect: hop
-    case  2: { const p=0.82+0.18*s(t*3);       return {dx:0,dy:0,       sx:p,                     sy:p,            rot:0             }; } // blob: pulse
-    case  3: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: t * 2.0       }; // spider: spin
-    case  4: return { dx: s(t*6)*5,            dy: s(t*12)*2,           sx: 1,                    sy: 1,           rot: s(t*6)*0.12   }; // crab: scuttle+tilt
-    case  5: return { dx: s(t*9)*3,            dy: -abs(s(t*9))*7,      sx: 1,                    sy: 1,           rot: 0             }; // insect: flutter
-    case  6: { const q=1+0.22*s(t*4);          return {dx:0,dy:5*(q-1), sx:q,                     sy:2-q,          rot:0             }; } // blob: squash & stretch
-    case  7: return { dx: s(t*22)*3,           dy: c(t*19)*3,           sx: 1,                    sy: 1,           rot: 0             }; // spider: vibrate
-    case  8: return { dx: s(t*3)*7,            dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*3)*0.18   }; // crab: wave
-    case  9: { const j=(t*3.5)%(Math.PI*2);    return {dx:0,           dy:-abs(s(j))*11,          sx:1,            sy:1,            rot:0}; } // insect: jump
-    case 10: { const p=0.88+0.12*s(t*2.5);     return {dx:0,dy:s(t*2.5)*4, sx:p,                 sy:p,            rot:0             }; } // blob: float+breathe
-    case 11: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*1.4)*0.45 }; // spider: sway
-    case 12: return { dx: s(t*11)*8,           dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: dash
-    case 13: { const z=1+0.2*s(t*3.5);         return {dx:0,dy:0,       sx:z,                     sy:z,            rot:0             }; } // insect: zoom
-    case 14: return { dx: s(t*5)*5,            dy: c(t*5)*4,            sx: 1,                    sy: 1,           rot: s(t*5)*0.22   }; // blob: orbit wiggle
-    case 15: return { dx: 0,                   dy: s(t*2)*6,            sx: 1,                    sy: 1,           rot: 0             }; // spider: float
-    default: return { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0 };
-  }
-}
-
-function drawAlienSprite(idx, cx, cy, ps) {
-  const a = ALIENS[idx];
-  const grid = SHAPES[a.s];
-  const cols = grid[0].length, rows = grid.length;
-  const ox = cx - (cols * ps) / 2;
-  const oy = cy - (rows * ps) / 2;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const v = grid[r][c];
-      if (!v) continue;
-      ctx.fillStyle = v === 2 ? a.e : a.c;
-      ctx.fillRect(Math.round(ox + c * ps), Math.round(oy + r * ps), ps, ps);
-    }
-  }
-}
-
 // ── Score pop ─────────────────────────────────────────────────────────────────
 let scoreScale = [1, 1];
 function triggerScorePop(p) { scoreScale[p-1] = 1.7; }
@@ -522,7 +420,7 @@ function collectPowerUp(player) {
   const pu  = PU_TYPES[powerUp.typeIdx];
   const idx = player - 1;
   puEffects[idx] = { id: pu.id, timer: pu.dur };
-  const col = player === 1 ? P1C() : P2C();
+  const col = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
   const px  = BAR_CX + powerUp.pos * BAR_HALF;
   addPuText(pu.desc, px, BAR_Y - 28, pu.col);
   addFlash(pu.col, 0.28);
@@ -745,7 +643,7 @@ function onTap(player) {
   const now = performance.now();
   if (rhythmBonus[idx] > 0.65 && now - lastComboShow[idx] > 700) {
     const words = rhythmBonus[idx] > 0.9 ? 'PERFECT!' : rhythmBonus[idx] > 0.78 ? 'COMBO!' : 'NICE!';
-    const col   = player === 1 ? P1C() : P2C();
+    const col   = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     addComboText(words, orbX + (player === 1 ? 44 : -44), BAR_Y - 32, col);
     lastComboShow[idx] = now;
   }
@@ -808,7 +706,7 @@ function winRound(player) {
   state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 3.2;
   const orbX = BAR_CX + state.balance * BAR_HALF;
   burst(player, orbX, true); burst(player, orbX, true);
-  addShake(1.2); addFlash(player === 1 ? P1C() : P2C(), 0.6);
+  addShake(1.2); addFlash(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), 0.6);
   sfxWin(player); triggerScorePop(player);
   if (state.scores[player-1] >= 2) storage.addWin(player);
 }
@@ -936,7 +834,7 @@ function drawBg() {
 
   // Side glow based on who's ahead
   if (Math.abs(state.balance) > 0.05) {
-    const col = state.balance > 0 ? P1C() : P2C();
+    const col = state.balance > 0 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const gx  = state.balance > 0 ? 0 : W;
     const mag = Math.abs(state.balance);
     const sg  = ctx.createRadialGradient(gx, H/2, 0, gx, H/2, W * 0.6);
@@ -953,18 +851,18 @@ function drawScore() {
 
   // Player labels
   ctx.font = '13px "Press Start 2P", monospace';
-  ctx.save(); ctx.shadowColor = P1C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P1C(); glowTxt('P1', cx - 155, 38); ctx.restore();
-  ctx.save(); ctx.shadowColor = P2C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P2C(); glowTxt('P2', cx + 155, 38); ctx.restore();
+  ctx.save(); ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 12;
+  ctx.fillStyle = getAlienColor(state.p1Icon); glowTxt('P1', cx - 155, 38); ctx.restore();
+  ctx.save(); ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 12;
+  ctx.fillStyle = getAlienColor(state.p2Icon); glowTxt('P2', cx + 155, 38); ctx.restore();
 
   // Score numbers — fire gradient + glow
   ctx.save();
   ctx.translate(cx - 155, 68);
   ctx.scale(scoreScale[0], scoreScale[0]);
   ctx.font = '32px "Press Start 2P", monospace';
-  ctx.shadowColor = P1C(); ctx.shadowBlur = 28;
-  ctx.fillStyle = P1C();
+  ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 28;
+  ctx.fillStyle = getAlienColor(state.p1Icon);
   ctx.fillText(state.scores[0], 0, 0);
   ctx.restore();
 
@@ -972,8 +870,8 @@ function drawScore() {
   ctx.translate(cx + 155, 68);
   ctx.scale(scoreScale[1], scoreScale[1]);
   ctx.font = '32px "Press Start 2P", monospace';
-  ctx.shadowColor = P2C(); ctx.shadowBlur = 28;
-  ctx.fillStyle = P2C();
+  ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 28;
+  ctx.fillStyle = getAlienColor(state.p2Icon);
   ctx.fillText(state.scores[1], 0, 0);
   ctx.restore();
 
@@ -1040,11 +938,11 @@ function drawScore() {
   const ps = 2, hSpacing = 24;
   // P1 hearts (left of ROUND text)
   for (let i = 0; i < 2; i++) {
-    drawHeart(cx - 108 + i * hSpacing, rowY, ps, P1C(), i < state.scores[0]);
+    drawHeart(cx - 108 + i * hSpacing, rowY, ps, getAlienColor(state.p1Icon), i < state.scores[0]);
   }
   // P2 hearts (right of ROUND text)
   for (let i = 0; i < 2; i++) {
-    drawHeart(cx + 88 + i * hSpacing, rowY, ps, P2C(), i < state.scores[1]);
+    drawHeart(cx + 88 + i * hSpacing, rowY, ps, getAlienColor(state.p2Icon), i < state.scores[1]);
   }
 }
 
@@ -1078,7 +976,7 @@ function drawBar() {
   for (let i = 0; i < N_SEGS; i++) {
     const sx    = bx + SEG_GAP + i * (SEG_W + SEG_GAP);
     const right = i >= half;
-    const col   = right ? P1C() : P2C();
+    const col   = right ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const lit   = right
       ? (state.balance > 0 && (i - half) < litCount)
       : (state.balance < 0 && (half - 1 - i) < litCount);
@@ -1092,7 +990,7 @@ function drawBar() {
 
   // Outer glow on the filled side (no shadow bleed inside clip)
   if (Math.abs(state.balance) > 0.05) {
-    const glowCol = state.balance > 0 ? P1C() : P2C();
+    const glowCol = state.balance > 0 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     ctx.save();
     ctx.shadowColor = glowCol; ctx.shadowBlur = 12;
     ctx.strokeStyle = hexAlpha(glowCol, 0.35); ctx.lineWidth = 1.5;
@@ -1127,8 +1025,8 @@ function drawBar() {
     ctx.fillRect(side === 'right' ? bx + bw - capW : bx, by, capW, BAR_H);
     ctx.restore();
   }
-  drawCapGlow('right', P1C(), nearR);
-  drawCapGlow('left',  P2C(), nearL);
+  drawCapGlow('right', getAlienColor(state.p1Icon), nearR);
+  drawCapGlow('left',  getAlienColor(state.p2Icon), nearL);
 
   // Outer chevron arrows
   function drawChevrons(originX, col, dir, proximity) {
@@ -1147,12 +1045,12 @@ function drawBar() {
       ctx.restore();
     }
   }
-  drawChevrons(bx + bw, P1C(),  1, nearR); // right end, pointing right →
-  drawChevrons(bx,      P2C(), -1, nearL); // left end,  pointing left  ←
+  drawChevrons(bx + bw, getAlienColor(state.p1Icon),  1, nearR); // right end, pointing right →
+  drawChevrons(bx,      getAlienColor(state.p2Icon), -1, nearL); // left end,  pointing left  ←
 
   // Trail — glowing, quadratic fade
   const orbX    = BAR_CX + state.balance * BAR_HALF;
-  const trailCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#c8c0ff';
+  const trailCol = state.balance > 0.05 ? getAlienColor(state.p1Icon) : state.balance < -0.05 ? getAlienColor(state.p2Icon) : '#c8c0ff';
   for (const t of orbTrail) {
     const frac = 1 - t.age / 0.45;
     if (frac <= 0) continue;
@@ -1165,7 +1063,7 @@ function drawBar() {
   }
 
   // Orb — coin spin + pulsing ring + specular
-  const orbCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#e0e0ff';
+  const orbCol = state.balance > 0.05 ? getAlienColor(state.p1Icon) : state.balance < -0.05 ? getAlienColor(state.p2Icon) : '#e0e0ff';
   const pt     = performance.now() * 0.002;
   // Coin spin: X flattens and flips like a coin; Y stays round
   const coinX  = Math.cos(coinAngle);                // -1..1
@@ -1224,7 +1122,7 @@ function drawPlayers() {
   const p1x = 140, p2x = W - 140, py = BAR_Y;
 
   function side(px, player, flash, tps) {
-    const col = player === 1 ? P1C() : P2C();
+    const col = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const key = isMobile ? 'TAP' : (player === 1 ? 'A' : 'L');
     const fa  = flash / 0.18;
 
@@ -1381,7 +1279,7 @@ function drawWinCelebration() {
   if (state.roundWinner === 0) return;
   const w        = state.roundWinner;
   const alienIdx = w === 1 ? state.p1Icon : state.p2Icon;
-  const col      = w === 1 ? P1C() : P2C();
+  const col      = w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
   const t        = performance.now() * 0.001;
   const elapsed  = 3.2 - state.reTimer;
   const cx = W / 2, cy = H / 2 + 62;
@@ -1564,7 +1462,7 @@ function drawNameEntry() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const cx = W / 2;
   const ne = nameEntryState;
-  const winCol = ne.winner === 1 ? P1C() : P2C();
+  const winCol = ne.winner === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
 
   // Title
   ctx.font = '11px "Press Start 2P", monospace';
@@ -1858,14 +1756,14 @@ function drawLobby() {
     const wy = LOBBY_BTN.y + LOBBY_BTN.h / 2 + 30;
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.save();
-    ctx.fillStyle = hexAlpha(P1C(), 0.6);
-    ctx.shadowColor = P1C(); ctx.shadowBlur = 6;
+    ctx.fillStyle = hexAlpha(getAlienColor(state.p1Icon), 0.6);
+    ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 6;
     ctx.textAlign = 'right';
     ctx.fillText(`P1 WINS: ${w1}`, W / 2 - 10, wy);
     ctx.restore();
     ctx.save();
-    ctx.fillStyle = hexAlpha(P2C(), 0.6);
-    ctx.shadowColor = P2C(); ctx.shadowBlur = 6;
+    ctx.fillStyle = hexAlpha(getAlienColor(state.p2Icon), 0.6);
+    ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 6;
     ctx.textAlign = 'left';
     ctx.fillText(`P2 WINS: ${w2}`, W / 2 + 10, wy);
     ctx.restore();
@@ -1997,7 +1895,7 @@ function draw() {
     if (state.roundWinner === 0) {
       drawOverlay('#aaaaaa', 'DRAW!', '');
     } else {
-      const col = state.roundWinner === 1 ? P1C() : P2C();
+      const col = state.roundWinner === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
       const ws = state.scores[state.roundWinner - 1];
       const matchWon = ws >= 2;
       drawOverlay(col,
@@ -2019,7 +1917,7 @@ function draw() {
     if (w === 0) {
       drawOverlay('#aaaaaa', 'MATCH DRAW!', `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
     } else {
-      drawOverlay(w === 1 ? P1C() : P2C(),
+      drawOverlay(w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon),
         `Player ${w} wins!`,
         `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
       drawWinCelebration();
