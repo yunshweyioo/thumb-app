@@ -2,6 +2,7 @@ import { canvas, ctx, W, H, DPR } from './canvas.ts';
 import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
          ROUND_TIME, METER_SEGS, METER_H, METER_W, METER_GAP, SEG_H,
          LOBBY_BTN, HOW_BTN, HS_BTN } from './constants.ts';
+import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
@@ -910,33 +911,6 @@ function loop(ts) {
   draw();
   requestAnimationFrame(loop);
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function hexAlpha(hex, a) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgba(${n>>16},${(n>>8)&255},${n&255},${a.toFixed(3)})`;
-}
-function shadeHex(hex, d) {
-  const n = parseInt(hex.slice(1), 16);
-  return `rgb(${Math.min(255,Math.max(0,(n>>16)+d))},${Math.min(255,Math.max(0,((n>>8)&255)+d))},${Math.min(255,Math.max(0,(n&255)+d))})`;
-}
-// Draw text with no shadow bleed — always resets shadow state first
-function txt(text, x, y) {
-  ctx.shadowBlur = 0; ctx.shadowColor = 'transparent';
-  ctx.fillText(text, x, y);
-}
-// Fire gradient fill matching the title: top=yellow → bottom=dark red
-// y0/y1 are the top and bottom of the text in current coordinate space
-function fireGrad(y0, y1) {
-  const g = ctx.createLinearGradient(0, y0, 0, y1);
-  g.addColorStop(0,    '#ffe600');
-  g.addColorStop(0.35, '#ff9900');
-  g.addColorStop(0.7,  '#ff3300');
-  g.addColorStop(1,    '#cc1100');
-  return g;
-}
-// Draw text with glow — does NOT reset shadow
-function glowTxt(text, x, y) { ctx.fillText(text, x, y); }
 
 // ── Draw: boot screen ─────────────────────────────────────────────────────────
 function drawBoot() {
