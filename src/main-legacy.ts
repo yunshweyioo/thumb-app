@@ -6,6 +6,14 @@ import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUti
 import { storage } from './storage/StorageManager.ts';
 import { GameState, initGameState, cloneGameState } from './state/GameState.ts';
 import { SHAPES, ALIENS, getAlienColor, alienAnim, drawAlienSprite } from './sprites/AlienSprites.ts';
+import { burst, tickParticles, drawParticles, resetParticles } from './vfx/Particles.ts';
+import { shakeAmt, flashAlpha, flashCol, orbBounce, orbVelX, coinAngle, orbitAngle, orbTrail,
+         addShake, tickShake, getShakeOffset, addFlash, tickFlash,
+         triggerOrbBounce, tickOrb, setOrbVelX, pushTrail, tickTrail,
+         resetScreenEffects } from './vfx/ScreenEffects.ts';
+import { addComboText, tickComboTexts, drawComboTexts,
+         addPuText, tickPuTexts, drawPuTexts, resetFloatTexts } from './vfx/FloatTexts.ts';
+import { scoreScale, triggerScorePop, tickScorePop, resetScorePop } from './vfx/ScorePop.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -140,80 +148,6 @@ function stopPinTone() {
   pinTone = null;
 }
 
-// ── Particles ─────────────────────────────────────────────────────────────────
-const particles = [];
-function burst(player, orbX, big) {
-  const color = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
-  const count = big ? 32 : 12;
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.7;
-    const spd   = big ? (90 + Math.random() * 240) : (55 + Math.random() * 140);
-    particles.push({
-      x: orbX, y: BAR_Y,
-      vx: Math.cos(angle) * spd * (player === 1 ? 0.7 : -0.7) + (Math.random()-0.5)*90,
-      vy: Math.sin(angle) * spd,
-      r: big ? (5 + Math.random() * 8) : (3 + Math.random() * 5),
-      life: 1.0, decay: big ? 1.5 : 2.2, color,
-    });
-  }
-}
-function tickParticles(dt) {
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx * dt; p.y += p.vy * dt;
-    p.vy += 200 * dt; p.vx *= (1 - 1.5 * dt);
-    p.life -= p.decay * dt;
-    if (p.life <= 0) particles.splice(i, 1);
-  }
-}
-function drawParticles() {
-  for (const p of particles) {
-    const sz = Math.ceil(p.r * Math.max(0.1, p.life));
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, p.life) * 0.9;
-    ctx.shadowColor = p.color; ctx.shadowBlur = 8;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(Math.round(p.x - sz/2), Math.round(p.y - sz/2), sz, sz);
-    ctx.restore();
-  }
-}
-
-// ── Screen shake ──────────────────────────────────────────────────────────────
-let shakeAmt = 0;
-function addShake(v) { shakeAmt = Math.max(shakeAmt, v); }
-function tickShake(dt) { shakeAmt = Math.max(0, shakeAmt - dt * 18); }
-function getShakeOffset() {
-  return shakeAmt > 0.2
-    ? { x: (Math.random()-0.5)*shakeAmt*14, y: (Math.random()-0.5)*shakeAmt*14 }
-    : { x: 0, y: 0 };
-}
-
-// ── Screen flash ──────────────────────────────────────────────────────────────
-let flashAlpha = 0, flashCol = '#fff';
-function addFlash(col, a = 1) { flashAlpha = a; flashCol = col; }
-function tickFlash(dt) { flashAlpha = Math.max(0, flashAlpha - dt * 4); }
-
-// ── Orb bounce ────────────────────────────────────────────────────────────────
-let orbBounce = 0;
-let orbVelX   = 0;   // -1..1, direction+magnitude of recent tap
-let coinAngle  = 0;
-let orbitAngle = 0;   // for orbiting dots
-function triggerOrbBounce() { orbBounce = 1; }
-function tickOrb(dt) {
-  orbBounce  = Math.max(0, orbBounce - dt * 9);
-  orbVelX   *= Math.max(0, 1 - dt * 6);
-  coinAngle  += orbVelX * dt * 18;
-  // Orbit dots spin at base speed + boost from current velocity
-  orbitAngle += dt * (2.5 + Math.abs(orbVelX) * 8);
-}
-
-// ── Orb trail ─────────────────────────────────────────────────────────────────
-const orbTrail = [];
-function pushTrail(x) {
-  orbTrail.push({ x, age: 0 });
-  if (orbTrail.length > 28) orbTrail.shift();
-}
-function tickTrail(dt) { orbTrail.forEach(t => t.age += dt); }
 
 // ── Tap history (TPS) ─────────────────────────────────────────────────────────
 const tapHistory  = [[], []];
@@ -323,14 +257,6 @@ function drawMeter(player) {
 
 // ── Pixel-art alien sprites ────────────────────────────────────────────────
 // 0=empty  1=body  2=eye accent
-// ── Score pop ─────────────────────────────────────────────────────────────────
-let scoreScale = [1, 1];
-function triggerScorePop(p) { scoreScale[p-1] = 1.7; }
-function tickScorePop(dt) {
-  scoreScale[0] = Math.max(1, scoreScale[0] - dt * 5);
-  scoreScale[1] = Math.max(1, scoreScale[1] - dt * 5);
-}
-
 // ── Boot sequence ─────────────────────────────────────────────────────────────
 const BOOT_LINES = [
   'SPAMCO SYSTEMS v1.0',
@@ -345,60 +271,7 @@ const BOOT_LINES = [
 let bootLineShown = 0, bootLineTimer = 0, bootDoneTimer = 0;
 const BOOT_LINE_DELAY = 0.18;
 
-// ── Combo floating texts ───────────────────────────────────────────────────────
-const comboTexts = [];
 const lastComboShow = [0, 0];
-function addComboText(text, x, y, col) {
-  comboTexts.push({ text, x, y, vy: -55, alpha: 1.0, col });
-}
-function tickComboTexts(dt) {
-  for (let i = comboTexts.length - 1; i >= 0; i--) {
-    const c = comboTexts[i];
-    c.y += c.vy * dt; c.alpha -= dt * 1.8;
-    if (c.alpha <= 0) comboTexts.splice(i, 1);
-  }
-}
-function drawComboTexts() {
-  for (const c of comboTexts) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, c.alpha);
-    ctx.font = '9px "Press Start 2P", monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.shadowColor = c.col; ctx.shadowBlur = 14;
-    ctx.fillStyle = '#fff';
-    ctx.fillText(c.text, c.x, c.y);
-    ctx.restore();
-  }
-}
-
-// ── Power-up pickup texts (zoom-out + fade, different from combo float-up) ────
-const puTexts = [];
-function addPuText(text, x, y, col) {
-  puTexts.push({ text, x, y, col, alpha: 1.0, scale: 0.4, age: 0 });
-}
-function tickPuTexts(dt) {
-  for (let i = puTexts.length - 1; i >= 0; i--) {
-    const p = puTexts[i];
-    p.age   += dt;
-    p.scale  = Math.min(1.4, p.scale + dt * 4.5); // zoom from small → overshoot
-    p.alpha -= dt * 1.4;
-    if (p.alpha <= 0) puTexts.splice(i, 1);
-  }
-}
-function drawPuTexts() {
-  for (const p of puTexts) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, p.alpha);
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale, p.scale);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '11px "Press Start 2P", monospace';
-    ctx.shadowColor = p.col; ctx.shadowBlur = 20;
-    ctx.fillStyle = p.col;
-    ctx.fillText(p.text, 0, 0);
-    ctx.restore();
-  }
-}
 
 // ── Power-ups ─────────────────────────────────────────────────────────────────
 const PU_TYPES = [
@@ -500,15 +373,15 @@ let state: GameState = initGameState();
 function initState() {
   state = initGameState();
   state.cdTimer = 1.0; state.cdScale = 1.6;
-  particles.length = orbTrail.length = 0;
-  orbBounce = orbVelX = coinAngle = orbitAngle = shakeAmt = flashAlpha = 0;
-  scoreScale = [1, 1];
+  resetParticles();
+  resetScreenEffects();
+  resetScorePop();
   meterLevel[0] = meterLevel[1] = meterPeak[0] = meterPeak[1] = 0;
   meterPeakT[0] = meterPeakT[1] = 0;
   spIdx[0] = spIdx[1] = 0;
   tapHistory[0].length = tapHistory[1].length = 0;
   lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
-  comboTexts.length = 0; puTexts.length = 0;
+  resetFloatTexts();
   lastComboShow[0] = lastComboShow[1] = 0;
   powerUp = null; puSpawnTimer = 5;
   puEffects[0] = { id: null, timer: 0 };
@@ -648,9 +521,9 @@ function onTap(player) {
     lastComboShow[idx] = now;
   }
   triggerOrbBounce();
-  orbVelX = Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7)));
+  setOrbVelX(Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7))));
   spikeMe(player);
-  burst(player, orbX, false);
+  burst(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), orbX, false);
   sfxTap(player);
   // Instant win if orb reaches the opponent's end
   if (state.balance >= 1.0) { winRound(1); return; }
@@ -705,7 +578,8 @@ function winRound(player) {
   state.scores[player-1]++;
   state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 3.2;
   const orbX = BAR_CX + state.balance * BAR_HALF;
-  burst(player, orbX, true); burst(player, orbX, true);
+  const winColor = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
+  burst(winColor, orbX, true); burst(winColor, orbX, true);
   addShake(1.2); addFlash(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), 0.6);
   sfxWin(player); triggerScorePop(player);
   if (state.scores[player-1] >= 2) storage.addWin(player);
@@ -729,7 +603,7 @@ function nextRound() {
     state.round++; state.balance = 0; state.tapCount = [0,0];
     state.roundTimer = ROUND_TIME;
     state.phase = 'lobby';
-    particles.length = orbTrail.length = 0;
+    resetParticles(); orbTrail.length = 0;
     tapHistory[0].length = tapHistory[1].length = 0;
   lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
   }
