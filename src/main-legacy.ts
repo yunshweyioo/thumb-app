@@ -3,6 +3,7 @@ import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
          ROUND_TIME, METER_SEGS, METER_H, METER_W, METER_GAP, SEG_H,
          LOBBY_BTN, HOW_BTN, HS_BTN } from './constants.ts';
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
+import { storage } from './storage/StorageManager.ts';
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
@@ -565,22 +566,6 @@ function drawPowerUp() {
   ctx.restore();
 }
 
-// ── High score (wins per player) ──────────────────────────────────────────────
-function getWins(p) { try { return parseInt(localStorage.getItem(`spamwars_wins_p${p}`) || '0'); } catch { return 0; } }
-function addWin(p)  { try { localStorage.setItem(`spamwars_wins_p${p}`, getWins(p) + 1); }          catch {} }
-
-// ── Leaderboard storage ───────────────────────────────────────────────────────
-function getLB() { try { return JSON.parse(localStorage.getItem('spamwars_lb') || '[]'); } catch { return []; } }
-function saveLB(lb) { try { localStorage.setItem('spamwars_lb', JSON.stringify(lb)); } catch {} }
-function addLBEntry(name, icon, spamCount, spamRate) {
-  const lb = getLB();
-  const ex = lb.find(e => e.name === name);
-  const date = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit' });
-  if (ex) { ex.wins++; ex.icon = icon; ex.date = date; ex.spamCount = spamCount; ex.spamRate = spamRate; }
-  else lb.push({ name, wins: 1, icon, date, spamCount, spamRate });
-  lb.sort((a, b) => b.wins - a.wins);
-  saveLB(lb.slice(0, 10));
-}
 
 // ── Lobby idle tracking ────────────────────────────────────────────────────────
 let lobbyEnteredTime = 0;
@@ -679,7 +664,7 @@ document.addEventListener('keydown', e => {
     if (k === ' ') { state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby'; return; }
     return;
   }
-  if (k === ' ' && state.phase === 'howToPlay') { localStorage.setItem('spamwars_seen_howto','1'); state.phase = howToPlayFrom; return; }
+  if (k === ' ' && state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
   if (state.phase === 'nameEntry') {
     const ne = nameEntryState;
     const ch = k.length === 1 && /[a-z0-9]/i.test(k) ? k.toUpperCase() : null;
@@ -721,7 +706,7 @@ function goToCharSelect() {
 function submitNameEntry() {
   const ne = nameEntryState;
   const name = ne.letters.filter(l => l !== '_').join('') || 'ANON';
-  addLBEntry(name, ne.winner === 1 ? state.p1Icon : state.p2Icon, ne.spamCount, ne.spamRate);
+  storage.addLBEntry(name, ne.winner === 1 ? state.p1Icon : state.p2Icon, ne.spamCount, ne.spamRate);
   lbNewName = name;
   state.phase = 'leaderboard';
 }
@@ -832,7 +817,7 @@ function winRound(player) {
   burst(player, orbX, true); burst(player, orbX, true);
   addShake(1.2); addFlash(player === 1 ? P1C() : P2C(), 0.6);
   sfxWin(player); triggerScorePop(player);
-  if (state.scores[player-1] >= 2) addWin(player);
+  if (state.scores[player-1] >= 2) storage.addWin(player);
 }
 function drawRound() {
   state.phase = 'roundEnd'; state.roundWinner = 0; state.reTimer = 2.8;
@@ -881,7 +866,7 @@ function loop(ts) {
       bootDoneTimer += dt;
       if (bootDoneTimer > 1.0) {
         howToPlayFrom = 'charSelect';
-        state.phase = localStorage.getItem('spamwars_seen_howto') ? 'charSelect' : 'howToPlay';
+        state.phase = storage.getSeenHowTo() ? 'charSelect' : 'howToPlay';
       }
     }
   } else if (state.phase === 'lobby') {
@@ -1687,7 +1672,7 @@ function drawLeaderboard() {
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.beginPath(); ctx.moveTo(60, 70); ctx.lineTo(W - 60, 70); ctx.stroke();
 
-  const lb = getLB();
+  const lb = storage.getLB();
   const RANKS = ['1ST','2ND','3RD','4TH','5TH','6TH','7TH','8TH','9TH','10TH'];
   const RANK_COLS = ['#ffd700','#c0c0c0','#cd7f32'];
   const ROW_H = 26;
@@ -1875,7 +1860,7 @@ function drawLobby() {
   }
 
   // Per-player win counts
-  const w1 = getWins(1), w2 = getWins(2);
+  const w1 = storage.getWins(1), w2 = storage.getWins(2);
   if (w1 > 0 || w2 > 0) {
     const wy = LOBBY_BTN.y + LOBBY_BTN.h / 2 + 30;
     ctx.font = '6px "Press Start 2P", monospace';
@@ -2218,7 +2203,7 @@ _canvas.addEventListener('touchstart', e => {
       continue;
     }
     if (state.phase === 'howToPlay') {
-      localStorage.setItem('spamwars_seen_howto', '1'); state.phase = howToPlayFrom; continue;
+      storage.setSeenHowTo(); state.phase = howToPlayFrom; continue;
     } else if (state.phase === 'playing') {
       if (isLeft) onTap(1); else onTap(2);
     } else if (state.phase === 'lobby') {
