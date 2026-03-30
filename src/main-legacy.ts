@@ -1,31 +1,12 @@
-const canvas = document.getElementById('c');
-const ctx    = canvas.getContext('2d');
-
-// ── Crisp canvas on retina / high-DPI screens ─────────────────────────────────
-const W = 820, H = 420;
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
-canvas.width        = W * DPR;
-canvas.height       = H * DPR;
-canvas.style.width  = W + 'px';
-canvas.style.height = H + 'px';
-ctx.scale(DPR, DPR);
+import { canvas, ctx, W, H, DPR } from './canvas.ts';
+import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
+         ROUND_TIME, METER_SEGS, METER_H, METER_W, METER_GAP, SEG_H,
+         LOBBY_BTN, HOW_BTN, HS_BTN } from './constants.ts';
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
 function P2C() { return ALIENS[state ? state.p2Icon : 8].c; }
 
-// ── Bar geometry ──────────────────────────────────────────────────────────────
-const BAR_Y    = 248;
-const BAR_CX   = W / 2;
-const BAR_HALF = 180;
-const BAR_H    = 30;
-const ORB_R    = 19;
-
-// ── Lobby button — sits where the round timer lives ───────────────────────────
-const TIMER_CY  = BAR_Y - 72;  // 176
-const LOBBY_BTN    = { x: W/2 - 100, y: TIMER_CY - 22, w: 200, h: 44 };
-const HOW_BTN      = { x: W/2 - 56, y: 8, w: 112, h: 16 };
-const HS_BTN       = { x: 0, y: 8, w: 0, h: 16 }; // x/w set dynamically in drawLobby
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 let nameEntryState = { letters: ['A','A','A'], cursor: 0, winner: 1 };
@@ -43,11 +24,6 @@ const BG_STARS = Array.from({length: 90}, (_, i) => {
   return [Math.round(x), Math.round(y), s];
 });
 let lobbyHover  = false;
-
-// ── Game tuning ───────────────────────────────────────────────────────────────
-const TAP_STEP   = 0.068;
-const DRIFT_SPD  = 0.10;
-const ROUND_TIME = 30;
 
 // ── Audio ─────────────────────────────────────────────────────────────────────
 let ac = null;
@@ -289,11 +265,6 @@ function tickMeters(dt) {
   }
 }
 
-const METER_SEGS = 12;
-const METER_H    = 188;
-const METER_W    = 16;
-const METER_GAP  = 3;
-const SEG_H      = (METER_H - (METER_SEGS - 1) * METER_GAP) / METER_SEGS;
 
 function drawMeter(player) {
   const isP1 = player === 1;
