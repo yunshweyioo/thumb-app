@@ -73,9 +73,7 @@ function initState() {
   spIdx[0] = spIdx[1] = 0;
   resetFloatTexts();
   lastComboShow[0] = lastComboShow[1] = 0;
-  powerUp = null; puSpawnTimer = 5;
-  puEffects[0] = { id: null, timer: 0 };
-  puEffects[1] = { id: null, timer: 0 };
+  resetPowerUps();
 }
 initState();
 
@@ -239,7 +237,7 @@ function tickGame(dt) {
   const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
   if      (state.balance > 0) state.balance = Math.max(0, state.balance - drift);
   else if (state.balance < 0) state.balance = Math.min(0, state.balance + drift);
-  tickPowerUp(dt);
+  tickPowerUp(dt, state.balance);
   tickComboTexts(dt);
   tickPuTexts(dt);
 
@@ -1490,7 +1488,7 @@ function draw() {
   drawPowerUp();
   drawComboTexts();
   drawPuTexts();
-  drawEffectHud();
+  drawEffectHud(getAlienColor(state.p1Icon), getAlienColor(state.p2Icon));
   drawChangeBtn();
   drawEscHint();
   drawScreenFlash();
