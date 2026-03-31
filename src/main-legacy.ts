@@ -26,6 +26,7 @@ import { TugOfWarMode } from './modes/TugOfWarMode.ts';
 import type { GameMode } from './modes/GameMode.ts';
 import { modeRegistry } from './modes/ModeRegistry.ts';
 import { inputBus, GameAction } from './input/InputBus.ts';
+import { LocalTransport } from './transport/LocalTransport.ts';
 import './input/KeyboardInput.ts';
 import './input/MouseInput.ts';
 import './input/TouchInput.ts';
@@ -65,6 +66,17 @@ modeRegistry.register(TugOfWarMode);
 activeMode = new TugOfWarMode();
 initState();
 
+
+// ── Transport ─────────────────────────────────────────────────────────────────
+const [p1Transport] = LocalTransport.pair();
+p1Transport.connect('local', 'p1');  // fire-and-forget (resolves immediately)
+
+// When a message arrives from the transport (future remote use):
+p1Transport.on('message', (msg) => {
+  if (msg.event === 'tap') {
+    inputBus.dispatch({ type: 'tap', player: (msg.payload as { player: 1 | 2 }).player });
+  }
+});
 
 // ── Input ─────────────────────────────────────────────────────────────────────
 
