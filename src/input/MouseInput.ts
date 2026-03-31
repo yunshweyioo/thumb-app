@@ -1,6 +1,6 @@
 import { inputBus } from './InputBus.ts';
 import { canvas } from '../canvas.ts';
-import { LOBBY_BTN, HOW_BTN, HS_BTN } from '../constants.ts';
+import { LOBBY_BTN } from '../constants.ts';
 import { clientToCanvas } from '../mobile/MobileScale.ts';
 
 // CHANGE_BTN and ESC_BTN are defined in main-legacy.ts with dynamic widths set at draw time.
