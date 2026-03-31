@@ -15,7 +15,8 @@ import { addComboText, tickComboTexts, drawComboTexts,
          addPuText, tickPuTexts, drawPuTexts, resetFloatTexts } from './vfx/FloatTexts.ts';
 import { scoreScale, triggerScorePop, tickScorePop, resetScorePop } from './vfx/ScorePop.ts';
 import { rhythmTracker } from './rhythm/RhythmTracker.ts';
-import { sfxTap, sfxCountdown, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
+import { sfxTap, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
+import { phaseController } from './state/PhaseController.ts';
 import { spIdx } from './audio/AudioEngine.ts';
 import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
          spawnPowerUp, collectPowerUp, tickPowerUp,
@@ -61,11 +62,6 @@ initState();
 
 
 // ── Input ─────────────────────────────────────────────────────────────────────
-function startCountdown() {
-  state.balance = 0;
-  state.phase = 'countdown';
-  state.countdown = 3; state.cdTimer = 1.0; state.cdScale = 1.6;
-}
 
 // Keyboard/mouse/touch events are now dispatched via inputBus (see src/input/)
 
@@ -73,11 +69,6 @@ const _canvas = document.getElementById('c');
 
 function inRect(mx, my, rect) {
   return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
-}
-function goToCharSelect() {
-  state.p1Cursor = state.p1Icon;
-  state.p2Cursor = state.p2Icon;
-  state.phase = 'charSelect';
 }
 function submitNameEntry() {
   const ne = nameEntryState;
@@ -117,7 +108,7 @@ inputBus.subscribe((action: GameAction) => {
       if (state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
       if (state.phase === 'nameEntry') { submitNameEntry(); return; }
       if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
-      if (state.phase === 'lobby') { startCountdown(); return; }
+      if (state.phase === 'lobby') { state.balance = 0; phaseController.startCountdown(state); return; }
       return;
     }
     case 'tap': {
@@ -156,7 +147,7 @@ inputBus.subscribe((action: GameAction) => {
     }
     case 'click': {
       const { x: mx, y: my } = action;
-      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
+      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { phaseController.goToCharSelect(state); return; }
       if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && inRect(mx, my, ESC_BTN)) {
         const i1 = state.p1Icon, i2 = state.p2Icon;
         if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
@@ -201,7 +192,7 @@ inputBus.subscribe((action: GameAction) => {
         state.phase = 'lobby';
         return;
       }
-      if (state.phase === 'lobby') startCountdown();
+      if (state.phase === 'lobby') { state.balance = 0; phaseController.startCountdown(state); }
       return;
     }
     case 'hover': {
@@ -347,24 +338,19 @@ function loop(ts) {
   } else if (state.phase === 'lobby') {
     tickParticles(dt); tickShake(dt); tickFlash(dt);
   } else if (state.phase === 'countdown') {
-    state.cdTimer -= dt;
-    state.cdScale = Math.max(1, state.cdScale - dt * 4.5);
-    if (state.cdTimer <= 0) {
-      if (state.countdown > 1) {
-        state.countdown--; state.cdTimer = 1.0; state.cdScale = 1.6; sfxCountdown(false);
-      } else if (state.countdown === 1) {
-        state.countdown = 0; state.cdTimer = 0.6; state.cdScale = 1.6; sfxCountdown(true);
-      } else {
-        state.phase = 'playing'; state.tapCount = [0,0];
-      }
+    const phaseEvts = phaseController.tick(state, dt);
+    for (const ev of phaseEvts) {
+      if (ev.type === 'round_start') { state.tapCount = [0, 0]; }
     }
     tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt); rhythmTracker.tickMeters(dt);
   } else if (state.phase === 'playing') {
     tickGame(dt);
   } else if (state.phase === 'roundEnd') {
     tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt);
-    state.reTimer -= dt;
-    if (state.reTimer <= 0) nextRound();
+    const phaseEvts = phaseController.tick(state, dt);
+    for (const ev of phaseEvts) {
+      if (ev.type === 'round_end_expired') { nextRound(); }
+    }
   } else if (state.phase === 'gameOver' || state.phase === 'nameEntry' || state.phase === 'leaderboard') {
     tickParticles(dt); tickFlash(dt);
   }
