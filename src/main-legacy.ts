@@ -20,6 +20,7 @@ import { spIdx } from './audio/AudioEngine.ts';
 import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
          spawnPowerUp, collectPowerUp, tickPowerUp,
          drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
+import { getCanvasScale, clientToCanvas } from './mobile/MobileScale.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -1621,9 +1622,7 @@ const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 _canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   for (const touch of e.changedTouches) {
-    const r = _canvas.getBoundingClientRect();
-    const mx = (touch.clientX - r.left) * (W / r.width);
-    const my = (touch.clientY - r.top)  * (H / r.height);
+    const { x: mx, y: my } = clientToCanvas(touch.clientX, touch.clientY);
     // Check overlay buttons first (work in any phase)
     if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; continue; }
     if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; continue; }
@@ -1661,9 +1660,7 @@ _canvas.addEventListener('touchstart', e => {
     } else if (state.phase === 'lobby') {
       startCountdown();
     } else if (state.phase === 'charSelect') {
-      const cr = _canvas.getBoundingClientRect();
-      const tmy = (touch.clientY - cr.top) * (H / cr.height);
-      const tmx = (touch.clientX - cr.left) * (W / cr.width);
+      const { x: tmx, y: tmy } = clientToCanvas(touch.clientX, touch.clientY);
       const csGridY = Math.round((H - 272) / 2) + 10;
       if (tmy > csGridY + 272 - 10) {
         // tap in bottom confirm strip → confirm selection
