@@ -48,7 +48,6 @@ let prevPhase = null;
 let state: GameState = initGameState();
 function initState() {
   state = initGameState();
-  state.cdTimer = 1.0; state.cdScale = 1.6;
   resetParticles();
   resetScreenEffects();
   resetScorePop();
@@ -108,7 +107,7 @@ inputBus.subscribe((action: GameAction) => {
       if (state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
       if (state.phase === 'nameEntry') { submitNameEntry(); return; }
       if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
-      if (state.phase === 'lobby') { state.balance = 0; phaseController.startCountdown(state); return; }
+      if (state.phase === 'lobby') { phaseController.startCountdown(state); return; }
       return;
     }
     case 'tap': {
@@ -192,7 +191,7 @@ inputBus.subscribe((action: GameAction) => {
         state.phase = 'lobby';
         return;
       }
-      if (state.phase === 'lobby') { state.balance = 0; phaseController.startCountdown(state); }
+      if (state.phase === 'lobby') { phaseController.startCountdown(state); }
       return;
     }
     case 'hover': {

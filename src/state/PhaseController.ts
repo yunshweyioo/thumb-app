@@ -3,12 +3,12 @@ import { sfxCountdown } from '../audio/ChiptuneAudio.ts';
 
 export type PhaseEvent =
   | { type: 'round_start' }
-  | { type: 'round_end_expired' }
-  | { type: 'boot_done' };
+  | { type: 'round_end_expired' };
 
 export class PhaseController {
   // Transition state → countdown and reset counters
   startCountdown(state: GameState): void {
+    state.balance = 0;
     state.phase = 'countdown';
     state.countdown = 3;
     state.cdTimer = 0;
