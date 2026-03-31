@@ -37,8 +37,8 @@ New implementation:         `http://localhost:5173/`
 
 | Phase | Doc | Status |
 |---|---|---|
-| 1 | [phase-1-foundation.md](phase-1-foundation.md) | ☐ |
-| 2 | [phase-2-systems.md](phase-2-systems.md) | ☐ |
+| 1 | [phase-1-foundation.md](phase-1-foundation.md) | ☑ |
+| 2 | [phase-2-systems.md](phase-2-systems.md) | ☑ |
 | 3 | [phase-3-input-renderer.md](phase-3-input-renderer.md) | ☐ |
 | 4 | [phase-4-abstractions.md](phase-4-abstractions.md) | ☐ |
 | 5 | [phase-5-theme-words.md](phase-5-theme-words.md) | ☐ |

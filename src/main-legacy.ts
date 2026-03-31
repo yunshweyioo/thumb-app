@@ -5,10 +5,22 @@ import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
 import { storage } from './storage/StorageManager.ts';
 import { GameState, initGameState, cloneGameState } from './state/GameState.ts';
-
-// ── Colors ────────────────────────────────────────────────────────────────────
-function P1C() { return ALIENS[state ? state.p1Icon : 0].c; }
-function P2C() { return ALIENS[state ? state.p2Icon : 8].c; }
+import { SHAPES, ALIENS, getAlienColor, alienAnim, drawAlienSprite } from './sprites/AlienSprites.ts';
+import { burst, tickParticles, drawParticles, resetParticles } from './vfx/Particles.ts';
+import { shakeAmt, flashAlpha, flashCol, orbBounce, orbVelX, coinAngle, orbitAngle, orbTrail,
+         addShake, tickShake, getShakeOffset, addFlash, tickFlash,
+         triggerOrbBounce, tickOrb, setOrbVelX, pushTrail, tickTrail,
+         resetScreenEffects } from './vfx/ScreenEffects.ts';
+import { addComboText, tickComboTexts, drawComboTexts,
+         addPuText, tickPuTexts, drawPuTexts, resetFloatTexts } from './vfx/FloatTexts.ts';
+import { scoreScale, triggerScorePop, tickScorePop, resetScorePop } from './vfx/ScorePop.ts';
+import { rhythmTracker } from './rhythm/RhythmTracker.ts';
+import { sfxTap, sfxCountdown, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
+import { spIdx } from './audio/AudioEngine.ts';
+import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
+         spawnPowerUp, collectPowerUp, tickPowerUp,
+         drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
+import { getCanvasScale, clientToCanvas } from './mobile/MobileScale.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -28,411 +40,8 @@ const BG_STARS = Array.from({length: 90}, (_, i) => {
 });
 let lobbyHover  = false;
 
-// ── Audio ─────────────────────────────────────────────────────────────────────
-let ac = null;
-function getAC() {
-  if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-  if (ac.state === 'suspended') ac.resume();
-  return ac;
-}
-// Scott Pilgrim style — cycling chiptune hit sounds, pitch scales with tap speed
-const SP_SCALES = [
-  [1, 1.5], [1.25, 1.78], [1.5, 2], [1.12, 1.68], [0.89, 1.33], [1.33, 1.78],
-];
-const spIdx = [0, 0];
-function sfxTap(player) {
-  try {
-    const a   = getAC();
-    const t   = a.currentTime;
-    const tps = getTPS(player);
-    // Base pitch: P1 higher/brighter, P2 lower/punchier
-    const root  = player === 1 ? 587 : 440;  // D5 vs A4
-    const boost = 1 + Math.min(tps / 20, 0.3);  // pitch creeps up when spamming fast
-    const [r1, r2] = SP_SCALES[spIdx[player-1] % SP_SCALES.length];
-    spIdx[player-1]++;
-
-    // ── Layer 1: punchy square-wave sweep ──
-    const o1 = a.createOscillator(), g1 = a.createGain();
-    o1.connect(g1); g1.connect(a.destination);
-    o1.type = 'square';
-    o1.frequency.setValueAtTime(root * r2 * boost, t);
-    o1.frequency.exponentialRampToValueAtTime(root * r1 * boost * 0.55, t + 0.06);
-    g1.gain.setValueAtTime(0.13, t);
-    g1.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    o1.start(t); o1.stop(t + 0.09);
-
-    // ── Layer 2: sub-octave thud ──
-    const o2 = a.createOscillator(), g2 = a.createGain();
-    o2.connect(g2); g2.connect(a.destination);
-    o2.type = 'square';
-    o2.frequency.setValueAtTime(root * r1 * boost * 0.5, t);
-    o2.frequency.exponentialRampToValueAtTime(root * boost * 0.25, t + 0.05);
-    g2.gain.setValueAtTime(0.07, t);
-    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
-    o2.start(t); o2.stop(t + 0.06);
-
-    // ── Layer 3: noise burst (percussive crunch) ──
-    const bufLen = Math.floor(a.sampleRate * 0.04);
-    const buf    = a.createBuffer(1, bufLen, a.sampleRate);
-    const data   = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
-    const noise  = a.createBufferSource();
-    noise.buffer = buf;
-    const gn     = a.createGain();
-    noise.connect(gn); gn.connect(a.destination);
-    gn.gain.setValueAtTime(0.055, t);
-    gn.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
-    noise.start(t); noise.stop(t + 0.04);
-  } catch (_) {}
-}
-function sfxCountdown(isGo) {
-  try {
-    const a = getAC(), o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.frequency.value = isGo ? 880 : 440;
-    o.type = 'sine';
-    g.gain.setValueAtTime(0.18, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + (isGo ? 0.25 : 0.1));
-    o.start(); o.stop(a.currentTime + (isGo ? 0.25 : 0.1));
-  } catch (_) {}
-}
-function sfxWin(player) {
-  try {
-    const a = getAC();
-    const freqs = player === 1 ? [523,659,784,1047] : [392,494,587,784];
-    freqs.forEach((f, i) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      const t = a.currentTime + i * 0.11;
-      o.frequency.value = f; o.type = 'sine';
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(0.18, t + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-      o.start(t); o.stop(t + 0.35);
-    });
-  } catch (_) {}
-}
-let pinTone = null;
-function startPinTone() {
-  if (pinTone) return;
-  try {
-    const a = getAC(), o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.type = 'sawtooth'; o.frequency.value = 80;
-    g.gain.setValueAtTime(0, a.currentTime);
-    g.gain.linearRampToValueAtTime(0.04, a.currentTime + 0.3);
-    o.start();
-    pinTone = { o, g };
-  } catch (_) {}
-}
-function updatePinTone(prog) {
-  if (!pinTone) return;
-  try {
-    const a = getAC();
-    pinTone.o.frequency.setTargetAtTime(80 + prog * 280, a.currentTime, 0.05);
-    pinTone.g.gain.setTargetAtTime(0.025 + prog * 0.05, a.currentTime, 0.05);
-  } catch (_) {}
-}
-function stopPinTone() {
-  if (!pinTone) return;
-  try {
-    const a = getAC();
-    pinTone.g.gain.linearRampToValueAtTime(0, a.currentTime + 0.12);
-    pinTone.o.stop(a.currentTime + 0.12);
-  } catch (_) {}
-  pinTone = null;
-}
-
-// ── Particles ─────────────────────────────────────────────────────────────────
-const particles = [];
-function burst(player, orbX, big) {
-  const color = player === 1 ? P1C() : P2C();
-  const count = big ? 32 : 12;
-  for (let i = 0; i < count; i++) {
-    const angle = (Math.PI * 2 / count) * i + Math.random() * 0.7;
-    const spd   = big ? (90 + Math.random() * 240) : (55 + Math.random() * 140);
-    particles.push({
-      x: orbX, y: BAR_Y,
-      vx: Math.cos(angle) * spd * (player === 1 ? 0.7 : -0.7) + (Math.random()-0.5)*90,
-      vy: Math.sin(angle) * spd,
-      r: big ? (5 + Math.random() * 8) : (3 + Math.random() * 5),
-      life: 1.0, decay: big ? 1.5 : 2.2, color,
-    });
-  }
-}
-function tickParticles(dt) {
-  for (let i = particles.length - 1; i >= 0; i--) {
-    const p = particles[i];
-    p.x += p.vx * dt; p.y += p.vy * dt;
-    p.vy += 200 * dt; p.vx *= (1 - 1.5 * dt);
-    p.life -= p.decay * dt;
-    if (p.life <= 0) particles.splice(i, 1);
-  }
-}
-function drawParticles() {
-  for (const p of particles) {
-    const sz = Math.ceil(p.r * Math.max(0.1, p.life));
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, p.life) * 0.9;
-    ctx.shadowColor = p.color; ctx.shadowBlur = 8;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(Math.round(p.x - sz/2), Math.round(p.y - sz/2), sz, sz);
-    ctx.restore();
-  }
-}
-
-// ── Screen shake ──────────────────────────────────────────────────────────────
-let shakeAmt = 0;
-function addShake(v) { shakeAmt = Math.max(shakeAmt, v); }
-function tickShake(dt) { shakeAmt = Math.max(0, shakeAmt - dt * 18); }
-function getShakeOffset() {
-  return shakeAmt > 0.2
-    ? { x: (Math.random()-0.5)*shakeAmt*14, y: (Math.random()-0.5)*shakeAmt*14 }
-    : { x: 0, y: 0 };
-}
-
-// ── Screen flash ──────────────────────────────────────────────────────────────
-let flashAlpha = 0, flashCol = '#fff';
-function addFlash(col, a = 1) { flashAlpha = a; flashCol = col; }
-function tickFlash(dt) { flashAlpha = Math.max(0, flashAlpha - dt * 4); }
-
-// ── Orb bounce ────────────────────────────────────────────────────────────────
-let orbBounce = 0;
-let orbVelX   = 0;   // -1..1, direction+magnitude of recent tap
-let coinAngle  = 0;
-let orbitAngle = 0;   // for orbiting dots
-function triggerOrbBounce() { orbBounce = 1; }
-function tickOrb(dt) {
-  orbBounce  = Math.max(0, orbBounce - dt * 9);
-  orbVelX   *= Math.max(0, 1 - dt * 6);
-  coinAngle  += orbVelX * dt * 18;
-  // Orbit dots spin at base speed + boost from current velocity
-  orbitAngle += dt * (2.5 + Math.abs(orbVelX) * 8);
-}
-
-// ── Orb trail ─────────────────────────────────────────────────────────────────
-const orbTrail = [];
-function pushTrail(x) {
-  orbTrail.push({ x, age: 0 });
-  if (orbTrail.length > 28) orbTrail.shift();
-}
-function tickTrail(dt) { orbTrail.forEach(t => t.age += dt); }
-
-// ── Tap history (TPS) ─────────────────────────────────────────────────────────
-const tapHistory  = [[], []];
-const lastTapTime = [0, 0];     // ms timestamp of previous tap
-const lastTapGap  = [0, 0];     // interval of previous tap pair
-const rhythmBonus = [0, 0];     // 0..1 — how consistent the rhythm is
-
-function recordTap(player) {
-  const now = performance.now();
-  const idx = player - 1;
-  const gap = now - lastTapTime[idx];
-  if (lastTapTime[idx] > 0 && gap < 600) {
-    // How similar is this gap to the last gap? (1 = identical, 0 = very different)
-    const consistency = lastTapGap[idx] > 0
-      ? Math.max(0, 1 - Math.abs(gap - lastTapGap[idx]) / lastTapGap[idx])
-      : 0;
-    rhythmBonus[idx] = Math.min(1, rhythmBonus[idx] * 0.6 + consistency * 0.5);
-  } else {
-    rhythmBonus[idx] *= 0.4; // gap too long, decay bonus
-  }
-  lastTapGap[idx]  = gap;
-  lastTapTime[idx] = now;
-  tapHistory[idx].push(now);
-}
-
-function getTPS(player) {
-  const now = performance.now();
-  tapHistory[player-1] = tapHistory[player-1].filter(t => now - t < 1000);
-  return tapHistory[player-1].length;
-}
-
-// ── Vertical energy meters ────────────────────────────────────────────────────
-const meterLevel = [0, 0];   // smooth 0-1
-const meterPeak  = [0, 0];   // held peak indicator 0-1
-const meterPeakT = [0, 0];   // timer before peak falls
-
-function spikeMe(player) {
-  const p = player - 1;
-  meterLevel[p] = Math.min(1, meterLevel[p] + 0.18);
-  if (meterLevel[p] >= meterPeak[p]) { meterPeak[p] = meterLevel[p]; meterPeakT[p] = 0.55; }
-}
-function tickMeters(dt) {
-  for (let p = 0; p < 2; p++) {
-    const target = Math.min(getTPS(p + 1) / 10, 1);
-    meterLevel[p] += (target > meterLevel[p] ? 10 : 3) * dt * (target - meterLevel[p]);
-    meterLevel[p] = Math.max(0, Math.min(1, meterLevel[p]));
-    meterPeakT[p] -= dt;
-    if (meterPeakT[p] < 0) meterPeak[p] = Math.max(meterLevel[p], meterPeak[p] - dt * 1.5);
-  }
-}
-
-
-function drawMeter(player) {
-  const isP1 = player === 1;
-  const mx   = isP1 ? 26 : W - 26;
-  const col  = isP1 ? P1C() : P2C();
-  const lv   = meterLevel[player - 1];
-  const topY = BAR_Y - METER_H / 2;
-  const PAD  = 4; // casing padding
-
-  // Segment colour ramp: green → yellow-green → yellow → orange → red
-  function segColor(frac) {
-    if (frac <= 0.20) return '#22dd22';
-    if (frac <= 0.40) return '#88dd00';
-    if (frac <= 0.58) return '#ddcc00';
-    if (frac <= 0.75) return '#ffaa00';
-    if (frac <= 0.88) return '#ff5500';
-    return '#ff1100';
-  }
-
-  // Outer casing
-  ctx.save();
-  ctx.beginPath();
-  ctx.roundRect(mx - METER_W/2 - PAD, topY - PAD, METER_W + PAD*2, METER_H + PAD*2, 4);
-  ctx.fillStyle = '#0d0d18';
-  ctx.fill();
-  ctx.strokeStyle = '#555566';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.restore();
-
-  // Segments
-  for (let i = 0; i < METER_SEGS; i++) {
-    const frac = (i + 1) / METER_SEGS;
-    const sy   = topY + METER_H - (i + 1) * SEG_H - i * METER_GAP;
-    const on   = frac <= lv;
-    const sc   = segColor(frac);
-
-    ctx.save();
-    if (on) { ctx.shadowColor = sc; ctx.shadowBlur = 8; }
-    ctx.beginPath(); ctx.rect(mx - METER_W/2, sy, METER_W, SEG_H);
-    ctx.fillStyle = on ? sc : hexAlpha(sc, 0.1);
-    ctx.fill();
-    if (!on) { ctx.strokeStyle = hexAlpha(sc, 0.2); ctx.lineWidth = 1; ctx.stroke(); }
-    ctx.restore();
-  }
-
-  // Label
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.save();
-  ctx.font = '6px "Press Start 2P", monospace';
-  ctx.shadowColor = col; ctx.shadowBlur = 8;
-  ctx.fillStyle = col;
-  glowTxt('PWR', mx, topY - 10);
-  ctx.restore();
-}
-
 // ── Pixel-art alien sprites ────────────────────────────────────────────────
 // 0=empty  1=body  2=eye accent
-const SHAPES = [
-  // 0: Classic wide crab (11×8)
-  [[0,0,1,0,0,0,0,0,1,0,0],
-   [0,0,0,1,0,0,0,1,0,0,0],
-   [0,0,1,1,1,1,1,1,1,0,0],
-   [0,1,1,2,1,1,1,2,1,1,0],
-   [1,1,1,1,1,1,1,1,1,1,1],
-   [1,0,1,1,1,1,1,1,1,0,1],
-   [1,0,1,0,0,0,0,0,1,0,1],
-   [0,0,0,1,1,0,1,1,0,0,0]],
-  // 1: Tall insect (9×8)
-  [[0,0,0,1,0,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,2,1,1,1,2,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,0,1,1,1,1,1,0,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 2: Round blob/ghost (9×8)
-  [[0,0,0,1,1,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,2,1,1,1,2,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,1,1,1,1,1,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 3: Spider with legs (9×8)
-  [[1,0,0,0,1,0,0,0,1],
-   [0,1,0,1,1,1,0,1,0],
-   [0,0,1,2,1,2,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,0,1,0,1,1,0],
-   [0,0,0,1,0,1,0,0,0],
-   [0,0,1,0,0,0,1,0,0]],
-];
-
-const ALIENS = [
-  {s:0,c:'#8833cc',e:'#ff5555'}, // 0  purple crab
-  {s:1,c:'#aacc33',e:'#ffee00'}, // 1  yellow-green insect
-  {s:2,c:'#ff44aa',e:'#ffff44'}, // 2  pink blob
-  {s:3,c:'#ffaa00',e:'#8833cc'}, // 3  orange spider
-  {s:0,c:'#33ccbb',e:'#8833cc'}, // 4  teal crab
-  {s:1,c:'#cc33cc',e:'#ffee00'}, // 5  magenta insect
-  {s:2,c:'#ffee00',e:'#aa33cc'}, // 6  yellow blob
-  {s:3,c:'#ff5500',e:'#ffff44'}, // 7  orange-red spider
-  {s:0,c:'#ff2266',e:'#ffff44'}, // 8  hot-pink crab
-  {s:1,c:'#66cc22',e:'#cc44cc'}, // 9  green insect
-  {s:2,c:'#4466ee',e:'#ffaa00'}, // 10 blue blob
-  {s:3,c:'#44cccc',e:'#884499'}, // 11 teal spider
-  {s:0,c:'#6644bb',e:'#ff4444'}, // 12 blue-purple crab
-  {s:1,c:'#ee4411',e:'#ffee00'}, // 13 orange-red insect
-  {s:2,c:'#ccee22',e:'#884499'}, // 14 yellow-green blob
-  {s:3,c:'#44aa44',e:'#ffee00'}, // 15 green spider
-];
-
-// ── Per-alien select animation ─────────────────────────────────────────────────
-// Returns {dx, dy, sx, sy, rot} canvas transforms for the selected sprite
-function alienAnim(i, t) {
-  const s = Math.sin, c = Math.cos, abs = Math.abs;
-  switch (i) {
-    case  0: return { dx: s(t*4)*6,            dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: scuttle L/R
-    case  1: return { dx: 0,                   dy: -abs(s(t*5))*9,      sx: 1,                    sy: 1,           rot: 0             }; // insect: hop
-    case  2: { const p=0.82+0.18*s(t*3);       return {dx:0,dy:0,       sx:p,                     sy:p,            rot:0             }; } // blob: pulse
-    case  3: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: t * 2.0       }; // spider: spin
-    case  4: return { dx: s(t*6)*5,            dy: s(t*12)*2,           sx: 1,                    sy: 1,           rot: s(t*6)*0.12   }; // crab: scuttle+tilt
-    case  5: return { dx: s(t*9)*3,            dy: -abs(s(t*9))*7,      sx: 1,                    sy: 1,           rot: 0             }; // insect: flutter
-    case  6: { const q=1+0.22*s(t*4);          return {dx:0,dy:5*(q-1), sx:q,                     sy:2-q,          rot:0             }; } // blob: squash & stretch
-    case  7: return { dx: s(t*22)*3,           dy: c(t*19)*3,           sx: 1,                    sy: 1,           rot: 0             }; // spider: vibrate
-    case  8: return { dx: s(t*3)*7,            dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*3)*0.18   }; // crab: wave
-    case  9: { const j=(t*3.5)%(Math.PI*2);    return {dx:0,           dy:-abs(s(j))*11,          sx:1,            sy:1,            rot:0}; } // insect: jump
-    case 10: { const p=0.88+0.12*s(t*2.5);     return {dx:0,dy:s(t*2.5)*4, sx:p,                 sy:p,            rot:0             }; } // blob: float+breathe
-    case 11: return { dx: 0,                   dy: 0,                   sx: 1,                    sy: 1,           rot: s(t*1.4)*0.45 }; // spider: sway
-    case 12: return { dx: s(t*11)*8,           dy: 0,                   sx: 1,                    sy: 1,           rot: 0             }; // crab: dash
-    case 13: { const z=1+0.2*s(t*3.5);         return {dx:0,dy:0,       sx:z,                     sy:z,            rot:0             }; } // insect: zoom
-    case 14: return { dx: s(t*5)*5,            dy: c(t*5)*4,            sx: 1,                    sy: 1,           rot: s(t*5)*0.22   }; // blob: orbit wiggle
-    case 15: return { dx: 0,                   dy: s(t*2)*6,            sx: 1,                    sy: 1,           rot: 0             }; // spider: float
-    default: return { dx: 0, dy: 0, sx: 1, sy: 1, rot: 0 };
-  }
-}
-
-function drawAlienSprite(idx, cx, cy, ps) {
-  const a = ALIENS[idx];
-  const grid = SHAPES[a.s];
-  const cols = grid[0].length, rows = grid.length;
-  const ox = cx - (cols * ps) / 2;
-  const oy = cy - (rows * ps) / 2;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const v = grid[r][c];
-      if (!v) continue;
-      ctx.fillStyle = v === 2 ? a.e : a.c;
-      ctx.fillRect(Math.round(ox + c * ps), Math.round(oy + r * ps), ps, ps);
-    }
-  }
-}
-
-// ── Score pop ─────────────────────────────────────────────────────────────────
-let scoreScale = [1, 1];
-function triggerScorePop(p) { scoreScale[p-1] = 1.7; }
-function tickScorePop(dt) {
-  scoreScale[0] = Math.max(1, scoreScale[0] - dt * 5);
-  scoreScale[1] = Math.max(1, scoreScale[1] - dt * 5);
-}
-
 // ── Boot sequence ─────────────────────────────────────────────────────────────
 const BOOT_LINES = [
   'SPAMCO SYSTEMS v1.0',
@@ -447,174 +56,25 @@ const BOOT_LINES = [
 let bootLineShown = 0, bootLineTimer = 0, bootDoneTimer = 0;
 const BOOT_LINE_DELAY = 0.18;
 
-// ── Combo floating texts ───────────────────────────────────────────────────────
-const comboTexts = [];
 const lastComboShow = [0, 0];
-function addComboText(text, x, y, col) {
-  comboTexts.push({ text, x, y, vy: -55, alpha: 1.0, col });
-}
-function tickComboTexts(dt) {
-  for (let i = comboTexts.length - 1; i >= 0; i--) {
-    const c = comboTexts[i];
-    c.y += c.vy * dt; c.alpha -= dt * 1.8;
-    if (c.alpha <= 0) comboTexts.splice(i, 1);
-  }
-}
-function drawComboTexts() {
-  for (const c of comboTexts) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, c.alpha);
-    ctx.font = '9px "Press Start 2P", monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.shadowColor = c.col; ctx.shadowBlur = 14;
-    ctx.fillStyle = '#fff';
-    ctx.fillText(c.text, c.x, c.y);
-    ctx.restore();
-  }
-}
-
-// ── Power-up pickup texts (zoom-out + fade, different from combo float-up) ────
-const puTexts = [];
-function addPuText(text, x, y, col) {
-  puTexts.push({ text, x, y, col, alpha: 1.0, scale: 0.4, age: 0 });
-}
-function tickPuTexts(dt) {
-  for (let i = puTexts.length - 1; i >= 0; i--) {
-    const p = puTexts[i];
-    p.age   += dt;
-    p.scale  = Math.min(1.4, p.scale + dt * 4.5); // zoom from small → overshoot
-    p.alpha -= dt * 1.4;
-    if (p.alpha <= 0) puTexts.splice(i, 1);
-  }
-}
-function drawPuTexts() {
-  for (const p of puTexts) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, p.alpha);
-    ctx.translate(p.x, p.y);
-    ctx.scale(p.scale, p.scale);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = '11px "Press Start 2P", monospace';
-    ctx.shadowColor = p.col; ctx.shadowBlur = 20;
-    ctx.fillStyle = p.col;
-    ctx.fillText(p.text, 0, 0);
-    ctx.restore();
-  }
-}
-
-// ── Power-ups ─────────────────────────────────────────────────────────────────
-const PU_TYPES = [
-  { id: 'speed',  label: 'SPD', col: '#ffee00', desc: 'SPEED UP!',   dur: 4.0 },
-  { id: 'reverse', label: 'REV', col: '#ff4444', desc: 'REVERSE!',   dur: 2.5 },
-  { id: 'freeze', label: 'FRZ', col: '#88ffee', desc: 'FREEZE!',     dur: 2.5 },
-];
-let powerUp = null;   // { pos: -1..1, typeIdx, age }
-let puSpawnTimer = 5;
-const puEffects = [{ id: null, timer: 0 }, { id: null, timer: 0 }];
-
-function spawnPowerUp() {
-  const sign = Math.random() > 0.5 ? 1 : -1;
-  const pos  = sign * (0.15 + Math.random() * 0.55);
-  powerUp = { pos, typeIdx: Math.floor(Math.random() * PU_TYPES.length), age: 0 };
-}
-function collectPowerUp(player) {
-  if (!powerUp) return;
-  const pu  = PU_TYPES[powerUp.typeIdx];
-  const idx = player - 1;
-  puEffects[idx] = { id: pu.id, timer: pu.dur };
-  const col = player === 1 ? P1C() : P2C();
-  const px  = BAR_CX + powerUp.pos * BAR_HALF;
-  addPuText(pu.desc, px, BAR_Y - 28, pu.col);
-  addFlash(pu.col, 0.28);
-  powerUp = null;
-  puSpawnTimer = 4 + Math.random() * 2;
-}
-function tickPowerUp(dt) {
-  puSpawnTimer -= dt;
-  if (!powerUp && puSpawnTimer <= 0) { spawnPowerUp(); puSpawnTimer = 4 + Math.random() * 2; }
-  if (powerUp) {
-    powerUp.age += dt;
-    if (Math.abs(state.balance - powerUp.pos) < 0.055) {
-      collectPowerUp(powerUp.pos > 0 ? 1 : 2);
-    }
-  }
-  for (const e of puEffects) { if (e.timer > 0) e.timer -= dt; }
-}
-function drawPowerUp() {
-  if (!powerUp) return;
-  const pu  = PU_TYPES[powerUp.typeIdx];
-  const t   = performance.now() * 0.001;
-  const px  = BAR_CX + powerUp.pos * BAR_HALF;
-  const bob = Math.sin(t * 4.5) * 4;
-  const pulse = 0.65 + 0.35 * Math.sin(t * 5.5);
-
-  ctx.save();
-  ctx.shadowColor = pu.col; ctx.shadowBlur = 18 * pulse;
-  ctx.beginPath();
-  ctx.moveTo(px,      BAR_Y - 13 + bob);
-  ctx.lineTo(px + 9,  BAR_Y      + bob);
-  ctx.lineTo(px,      BAR_Y + 13 + bob);
-  ctx.lineTo(px - 9,  BAR_Y      + bob);
-  ctx.closePath();
-  ctx.fillStyle = hexAlpha(pu.col, 0.82 * pulse);
-  ctx.fill();
-  ctx.strokeStyle = pu.col; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.font = '5px "Press Start 2P", monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#000';
-  ctx.fillText(pu.label, px, BAR_Y + bob);
-  ctx.restore();
-}
-
 
 // ── Lobby idle tracking ────────────────────────────────────────────────────────
 let lobbyEnteredTime = 0;
 let prevPhase = null;
-
-// ── Active effect HUD helper ───────────────────────────────────────────────────
-function drawEffectHud() {
-  [0, 1].forEach(idx => {
-    const e = puEffects[idx];
-    if (!e.id || e.timer <= 0) return;
-    const pu  = PU_TYPES.find(p => p.id === e.id);
-    const px  = idx === 0 ? 140 : W - 140;
-    const py  = BAR_Y + 76;
-    const frac = e.timer / pu.dur;
-    ctx.save();
-    ctx.shadowColor = pu.col; ctx.shadowBlur = 10 * frac;
-    ctx.font = '6px "Press Start 2P", monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = pu.col;
-    ctx.fillText(pu.label, px, py);
-    // tiny timer bar
-    const bw = 40, bh = 4;
-    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw, bh);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
-    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw * frac, bh);
-    ctx.fillStyle = pu.col; ctx.fill();
-    ctx.restore();
-  });
-}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let state: GameState = initGameState();
 function initState() {
   state = initGameState();
   state.cdTimer = 1.0; state.cdScale = 1.6;
-  particles.length = orbTrail.length = 0;
-  orbBounce = orbVelX = coinAngle = orbitAngle = shakeAmt = flashAlpha = 0;
-  scoreScale = [1, 1];
-  meterLevel[0] = meterLevel[1] = meterPeak[0] = meterPeak[1] = 0;
-  meterPeakT[0] = meterPeakT[1] = 0;
+  resetParticles();
+  resetScreenEffects();
+  resetScorePop();
+  rhythmTracker.reset();
   spIdx[0] = spIdx[1] = 0;
-  tapHistory[0].length = tapHistory[1].length = 0;
-  lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
-  comboTexts.length = 0; puTexts.length = 0;
+  resetFloatTexts();
   lastComboShow[0] = lastComboShow[1] = 0;
-  powerUp = null; puSpawnTimer = 5;
-  puEffects[0] = { id: null, timer: 0 };
-  puEffects[1] = { id: null, timer: 0 };
+  resetPowerUps();
 }
 initState();
 
@@ -681,12 +141,9 @@ document.addEventListener('keydown', e => {
 
 const _canvas = document.getElementById('c');
 
-function canvasCoords(e) {
-  const r = _canvas.getBoundingClientRect();
-  return {
-    mx: (e.clientX - r.left) * (W / r.width),
-    my: (e.clientY - r.top)  * (H / r.height),
-  };
+function canvasCoords(e: { clientX: number; clientY: number }) {
+  const { x: mx, y: my } = clientToCanvas(e.clientX, e.clientY);
+  return { mx, my };
 }
 function inRect(mx, my, rect) {
   return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
@@ -732,7 +189,7 @@ function onTap(player) {
   const orbX = BAR_CX + state.balance * BAR_HALF;
   // Speed boost effect
   const speedMult = (puEffects[idx].id === 'speed' && puEffects[idx].timer > 0) ? 1.6 : 1;
-  const step = TAP_STEP * (1 + rhythmBonus[idx] * 0.6) * speedMult;
+  const step = TAP_STEP * (1 + rhythmTracker.rhythmBonus[idx] * 0.6) * speedMult;
   const oppIdx = 1 - idx;
   const reversed = puEffects[oppIdx].id === 'reverse' && puEffects[oppIdx].timer > 0;
   if (player === 1) state.balance = reversed ? Math.max(-1, state.balance - step) : Math.min( 1, state.balance + step);
@@ -740,19 +197,19 @@ function onTap(player) {
   state.tapFlash[player-1] = 0.18;
   state.tapCount[player-1]++;
   state.totalTaps[player-1]++;
-  recordTap(player);
+  rhythmTracker.recordTap(player);
   // Combo floating text
   const now = performance.now();
-  if (rhythmBonus[idx] > 0.65 && now - lastComboShow[idx] > 700) {
-    const words = rhythmBonus[idx] > 0.9 ? 'PERFECT!' : rhythmBonus[idx] > 0.78 ? 'COMBO!' : 'NICE!';
-    const col   = player === 1 ? P1C() : P2C();
+  if (rhythmTracker.rhythmBonus[idx] > 0.65 && now - lastComboShow[idx] > 700) {
+    const words = rhythmTracker.rhythmBonus[idx] > 0.9 ? 'PERFECT!' : rhythmTracker.rhythmBonus[idx] > 0.78 ? 'COMBO!' : 'NICE!';
+    const col   = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     addComboText(words, orbX + (player === 1 ? 44 : -44), BAR_Y - 32, col);
     lastComboShow[idx] = now;
   }
   triggerOrbBounce();
-  orbVelX = Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7)));
-  spikeMe(player);
-  burst(player, orbX, false);
+  setOrbVelX(Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7))));
+  rhythmTracker.spikeMe(player);
+  burst(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), orbX, false);
   sfxTap(player);
   // Instant win if orb reaches the opponent's end
   if (state.balance >= 1.0) { winRound(1); return; }
@@ -772,13 +229,13 @@ function tickGame(dt) {
 
   // Idle boost — if both players have stopped tapping, ball snaps back faster
   const now         = performance.now();
-  const sinceAnyTap = now - Math.max(lastTapTime[0], lastTapTime[1]);
+  const sinceAnyTap = now - Math.max(rhythmTracker.lastTapTime[0], rhythmTracker.lastTapTime[1]);
   const idleBoost   = sinceAnyTap > 250 ? 1 + Math.min(4, (sinceAnyTap - 250) / 200) : 1;
 
   const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
   if      (state.balance > 0) state.balance = Math.max(0, state.balance - drift);
   else if (state.balance < 0) state.balance = Math.min(0, state.balance + drift);
-  tickPowerUp(dt);
+  tickPowerUp(dt, state.balance);
   tickComboTexts(dt);
   tickPuTexts(dt);
 
@@ -801,14 +258,15 @@ function tickGame(dt) {
   const orbX = BAR_CX + state.balance * BAR_HALF;
   pushTrail(orbX);
   tickParticles(dt); tickOrb(dt); tickTrail(dt);
-  tickShake(dt); tickFlash(dt); tickScorePop(dt); tickMeters(dt);
+  tickShake(dt); tickFlash(dt); tickScorePop(dt); rhythmTracker.tickMeters(dt);
 }
 function winRound(player) {
   state.scores[player-1]++;
   state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 3.2;
   const orbX = BAR_CX + state.balance * BAR_HALF;
-  burst(player, orbX, true); burst(player, orbX, true);
-  addShake(1.2); addFlash(player === 1 ? P1C() : P2C(), 0.6);
+  const winColor = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
+  burst(winColor, orbX, true); burst(winColor, orbX, true);
+  addShake(1.2); addFlash(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), 0.6);
   sfxWin(player); triggerScorePop(player);
   if (state.scores[player-1] >= 2) storage.addWin(player);
 }
@@ -831,9 +289,8 @@ function nextRound() {
     state.round++; state.balance = 0; state.tapCount = [0,0];
     state.roundTimer = ROUND_TIME;
     state.phase = 'lobby';
-    particles.length = orbTrail.length = 0;
-    tapHistory[0].length = tapHistory[1].length = 0;
-  lastTapTime[0] = lastTapTime[1] = lastTapGap[0] = lastTapGap[1] = rhythmBonus[0] = rhythmBonus[1] = 0;
+    resetParticles(); orbTrail.length = 0;
+    rhythmTracker.reset();
   }
 }
 
@@ -876,7 +333,7 @@ function loop(ts) {
         state.phase = 'playing'; state.tapCount = [0,0];
       }
     }
-    tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt); tickMeters(dt);
+    tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt); rhythmTracker.tickMeters(dt);
   } else if (state.phase === 'playing') {
     tickGame(dt);
   } else if (state.phase === 'roundEnd') {
@@ -936,7 +393,7 @@ function drawBg() {
 
   // Side glow based on who's ahead
   if (Math.abs(state.balance) > 0.05) {
-    const col = state.balance > 0 ? P1C() : P2C();
+    const col = state.balance > 0 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const gx  = state.balance > 0 ? 0 : W;
     const mag = Math.abs(state.balance);
     const sg  = ctx.createRadialGradient(gx, H/2, 0, gx, H/2, W * 0.6);
@@ -953,18 +410,18 @@ function drawScore() {
 
   // Player labels
   ctx.font = '13px "Press Start 2P", monospace';
-  ctx.save(); ctx.shadowColor = P1C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P1C(); glowTxt('P1', cx - 155, 38); ctx.restore();
-  ctx.save(); ctx.shadowColor = P2C(); ctx.shadowBlur = 12;
-  ctx.fillStyle = P2C(); glowTxt('P2', cx + 155, 38); ctx.restore();
+  ctx.save(); ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 12;
+  ctx.fillStyle = getAlienColor(state.p1Icon); glowTxt('P1', cx - 155, 38); ctx.restore();
+  ctx.save(); ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 12;
+  ctx.fillStyle = getAlienColor(state.p2Icon); glowTxt('P2', cx + 155, 38); ctx.restore();
 
   // Score numbers — fire gradient + glow
   ctx.save();
   ctx.translate(cx - 155, 68);
   ctx.scale(scoreScale[0], scoreScale[0]);
   ctx.font = '32px "Press Start 2P", monospace';
-  ctx.shadowColor = P1C(); ctx.shadowBlur = 28;
-  ctx.fillStyle = P1C();
+  ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 28;
+  ctx.fillStyle = getAlienColor(state.p1Icon);
   ctx.fillText(state.scores[0], 0, 0);
   ctx.restore();
 
@@ -972,8 +429,8 @@ function drawScore() {
   ctx.translate(cx + 155, 68);
   ctx.scale(scoreScale[1], scoreScale[1]);
   ctx.font = '32px "Press Start 2P", monospace';
-  ctx.shadowColor = P2C(); ctx.shadowBlur = 28;
-  ctx.fillStyle = P2C();
+  ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 28;
+  ctx.fillStyle = getAlienColor(state.p2Icon);
   ctx.fillText(state.scores[1], 0, 0);
   ctx.restore();
 
@@ -1040,11 +497,11 @@ function drawScore() {
   const ps = 2, hSpacing = 24;
   // P1 hearts (left of ROUND text)
   for (let i = 0; i < 2; i++) {
-    drawHeart(cx - 108 + i * hSpacing, rowY, ps, P1C(), i < state.scores[0]);
+    drawHeart(cx - 108 + i * hSpacing, rowY, ps, getAlienColor(state.p1Icon), i < state.scores[0]);
   }
   // P2 hearts (right of ROUND text)
   for (let i = 0; i < 2; i++) {
-    drawHeart(cx + 88 + i * hSpacing, rowY, ps, P2C(), i < state.scores[1]);
+    drawHeart(cx + 88 + i * hSpacing, rowY, ps, getAlienColor(state.p2Icon), i < state.scores[1]);
   }
 }
 
@@ -1078,7 +535,7 @@ function drawBar() {
   for (let i = 0; i < N_SEGS; i++) {
     const sx    = bx + SEG_GAP + i * (SEG_W + SEG_GAP);
     const right = i >= half;
-    const col   = right ? P1C() : P2C();
+    const col   = right ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const lit   = right
       ? (state.balance > 0 && (i - half) < litCount)
       : (state.balance < 0 && (half - 1 - i) < litCount);
@@ -1092,7 +549,7 @@ function drawBar() {
 
   // Outer glow on the filled side (no shadow bleed inside clip)
   if (Math.abs(state.balance) > 0.05) {
-    const glowCol = state.balance > 0 ? P1C() : P2C();
+    const glowCol = state.balance > 0 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     ctx.save();
     ctx.shadowColor = glowCol; ctx.shadowBlur = 12;
     ctx.strokeStyle = hexAlpha(glowCol, 0.35); ctx.lineWidth = 1.5;
@@ -1127,8 +584,8 @@ function drawBar() {
     ctx.fillRect(side === 'right' ? bx + bw - capW : bx, by, capW, BAR_H);
     ctx.restore();
   }
-  drawCapGlow('right', P1C(), nearR);
-  drawCapGlow('left',  P2C(), nearL);
+  drawCapGlow('right', getAlienColor(state.p1Icon), nearR);
+  drawCapGlow('left',  getAlienColor(state.p2Icon), nearL);
 
   // Outer chevron arrows
   function drawChevrons(originX, col, dir, proximity) {
@@ -1147,12 +604,12 @@ function drawBar() {
       ctx.restore();
     }
   }
-  drawChevrons(bx + bw, P1C(),  1, nearR); // right end, pointing right →
-  drawChevrons(bx,      P2C(), -1, nearL); // left end,  pointing left  ←
+  drawChevrons(bx + bw, getAlienColor(state.p1Icon),  1, nearR); // right end, pointing right →
+  drawChevrons(bx,      getAlienColor(state.p2Icon), -1, nearL); // left end,  pointing left  ←
 
   // Trail — glowing, quadratic fade
   const orbX    = BAR_CX + state.balance * BAR_HALF;
-  const trailCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#c8c0ff';
+  const trailCol = state.balance > 0.05 ? getAlienColor(state.p1Icon) : state.balance < -0.05 ? getAlienColor(state.p2Icon) : '#c8c0ff';
   for (const t of orbTrail) {
     const frac = 1 - t.age / 0.45;
     if (frac <= 0) continue;
@@ -1165,7 +622,7 @@ function drawBar() {
   }
 
   // Orb — coin spin + pulsing ring + specular
-  const orbCol = state.balance > 0.05 ? P1C() : state.balance < -0.05 ? P2C() : '#e0e0ff';
+  const orbCol = state.balance > 0.05 ? getAlienColor(state.p1Icon) : state.balance < -0.05 ? getAlienColor(state.p2Icon) : '#e0e0ff';
   const pt     = performance.now() * 0.002;
   // Coin spin: X flattens and flips like a coin; Y stays round
   const coinX  = Math.cos(coinAngle);                // -1..1
@@ -1224,7 +681,7 @@ function drawPlayers() {
   const p1x = 140, p2x = W - 140, py = BAR_Y;
 
   function side(px, player, flash, tps) {
-    const col = player === 1 ? P1C() : P2C();
+    const col = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
     const key = isMobile ? 'TAP' : (player === 1 ? 'A' : 'L');
     const fa  = flash / 0.18;
 
@@ -1280,8 +737,8 @@ function drawPlayers() {
     txt(`${state.tapCount[player-1]}`, px, barY + barH + 24);
   }
 
-  side(p1x, 1, state.tapFlash[0], getTPS(1));
-  side(p2x, 2, state.tapFlash[1], getTPS(2));
+  side(p1x, 1, state.tapFlash[0], rhythmTracker.getTPS(1));
+  side(p2x, 2, state.tapFlash[1], rhythmTracker.getTPS(2));
 }
 
 // ── Draw: round timer ─────────────────────────────────────────────────────────
@@ -1381,7 +838,7 @@ function drawWinCelebration() {
   if (state.roundWinner === 0) return;
   const w        = state.roundWinner;
   const alienIdx = w === 1 ? state.p1Icon : state.p2Icon;
-  const col      = w === 1 ? P1C() : P2C();
+  const col      = w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
   const t        = performance.now() * 0.001;
   const elapsed  = 3.2 - state.reTimer;
   const cx = W / 2, cy = H / 2 + 62;
@@ -1564,7 +1021,7 @@ function drawNameEntry() {
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const cx = W / 2;
   const ne = nameEntryState;
-  const winCol = ne.winner === 1 ? P1C() : P2C();
+  const winCol = ne.winner === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
 
   // Title
   ctx.font = '11px "Press Start 2P", monospace';
@@ -1858,14 +1315,14 @@ function drawLobby() {
     const wy = LOBBY_BTN.y + LOBBY_BTN.h / 2 + 30;
     ctx.font = '6px "Press Start 2P", monospace';
     ctx.save();
-    ctx.fillStyle = hexAlpha(P1C(), 0.6);
-    ctx.shadowColor = P1C(); ctx.shadowBlur = 6;
+    ctx.fillStyle = hexAlpha(getAlienColor(state.p1Icon), 0.6);
+    ctx.shadowColor = getAlienColor(state.p1Icon); ctx.shadowBlur = 6;
     ctx.textAlign = 'right';
     ctx.fillText(`P1 WINS: ${w1}`, W / 2 - 10, wy);
     ctx.restore();
     ctx.save();
-    ctx.fillStyle = hexAlpha(P2C(), 0.6);
-    ctx.shadowColor = P2C(); ctx.shadowBlur = 6;
+    ctx.fillStyle = hexAlpha(getAlienColor(state.p2Icon), 0.6);
+    ctx.shadowColor = getAlienColor(state.p2Icon); ctx.shadowBlur = 6;
     ctx.textAlign = 'left';
     ctx.fillText(`P2 WINS: ${w2}`, W / 2 + 10, wy);
     ctx.restore();
@@ -1984,8 +1441,8 @@ function draw() {
   }
 
   drawScore();
-  drawMeter(1);
-  drawMeter(2);
+  rhythmTracker.drawMeter(1, getAlienColor(state.p1Icon), getAlienColor(state.p2Icon));
+  rhythmTracker.drawMeter(2, getAlienColor(state.p1Icon), getAlienColor(state.p2Icon));
   drawBar();
   drawPlayers();
   drawParticles();
@@ -1997,7 +1454,7 @@ function draw() {
     if (state.roundWinner === 0) {
       drawOverlay('#aaaaaa', 'DRAW!', '');
     } else {
-      const col = state.roundWinner === 1 ? P1C() : P2C();
+      const col = state.roundWinner === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
       const ws = state.scores[state.roundWinner - 1];
       const matchWon = ws >= 2;
       drawOverlay(col,
@@ -2019,7 +1476,7 @@ function draw() {
     if (w === 0) {
       drawOverlay('#aaaaaa', 'MATCH DRAW!', `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
     } else {
-      drawOverlay(w === 1 ? P1C() : P2C(),
+      drawOverlay(w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon),
         `Player ${w} wins!`,
         `${state.scores[0]} – ${state.scores[1]}   ·   press ESC to restart`);
       drawWinCelebration();
@@ -2029,7 +1486,7 @@ function draw() {
   drawPowerUp();
   drawComboTexts();
   drawPuTexts();
-  drawEffectHud();
+  drawEffectHud(getAlienColor(state.p1Icon), getAlienColor(state.p2Icon));
   drawChangeBtn();
   drawEscHint();
   drawScreenFlash();
@@ -2162,9 +1619,7 @@ const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 _canvas.addEventListener('touchstart', e => {
   e.preventDefault();
   for (const touch of e.changedTouches) {
-    const r = _canvas.getBoundingClientRect();
-    const mx = (touch.clientX - r.left) * (W / r.width);
-    const my = (touch.clientY - r.top)  * (H / r.height);
+    const { x: mx, y: my } = clientToCanvas(touch.clientX, touch.clientY);
     // Check overlay buttons first (work in any phase)
     if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; continue; }
     if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; continue; }
@@ -2175,8 +1630,7 @@ _canvas.addEventListener('touchstart', e => {
       initState(); state.p1Icon = i1; state.p2Icon = i2;
       state.p1Cursor = i1; state.p2Cursor = i2; state.phase = 'lobby'; continue;
     }
-    const midX = r.left + r.width / 2;
-    const isLeft = touch.clientX < midX;
+    const isLeft = mx < W / 2;
     if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
     if (state.phase === 'nameEntry') {
       const ne = nameEntryState;
@@ -2202,9 +1656,7 @@ _canvas.addEventListener('touchstart', e => {
     } else if (state.phase === 'lobby') {
       startCountdown();
     } else if (state.phase === 'charSelect') {
-      const cr = _canvas.getBoundingClientRect();
-      const tmy = (touch.clientY - cr.top) * (H / cr.height);
-      const tmx = (touch.clientX - cr.left) * (W / cr.width);
+      const { x: tmx, y: tmy } = clientToCanvas(touch.clientX, touch.clientY);
       const csGridY = Math.round((H - 272) / 2) + 10;
       if (tmy > csGridY + 272 - 10) {
         // tap in bottom confirm strip → confirm selection
