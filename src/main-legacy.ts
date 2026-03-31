@@ -21,6 +21,10 @@ import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
          spawnPowerUp, collectPowerUp, tickPowerUp,
          drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
 import { getCanvasScale, clientToCanvas } from './mobile/MobileScale.ts';
+import { inputBus, GameAction } from './input/InputBus.ts';
+import './input/KeyboardInput.ts';
+import './input/MouseInput.ts';
+import './input/TouchInput.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -39,6 +43,9 @@ const BG_STARS = Array.from({length: 90}, (_, i) => {
   return [Math.round(x), Math.round(y), s];
 });
 let lobbyHover  = false;
+const CHANGE_BTN = { x: 8, y: 8, w: 0, h: 16 }; // w set dynamically
+const ESC_BTN    = { x: 0, y: 8, w: 0, h: 16 }; // x/w set dynamically
+let changeHover = false;
 
 // ── Pixel-art alien sprites ────────────────────────────────────────────────
 // 0=empty  1=body  2=eye accent
@@ -86,65 +93,10 @@ function startCountdown() {
   state.countdown = 3; state.cdTimer = 1.0; state.cdScale = 1.6;
 }
 
-document.addEventListener('keydown', e => {
-  const k = e.key.toLowerCase();
-  if (['a','s','l','k',' '].includes(k)) e.preventDefault();
-  if (k === 'escape') {
-    e.preventDefault();
-    if (state.phase === 'charSelect') return;
-    if (state.phase === 'nameEntry') { state.phase = 'leaderboard'; return; }
-    if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
-    const i1 = state.p1Icon, i2 = state.p2Icon;
-    initState();
-    state.p1Icon = i1; state.p2Icon = i2;
-    state.p1Cursor = i1; state.p2Cursor = i2;
-    state.phase = 'lobby';
-    return;
-  }
-  if (k === 'r' && state.phase === 'gameOver') {
-    const i1 = state.p1Icon, i2 = state.p2Icon;
-    initState();
-    state.p1Icon = i1; state.p2Icon = i2;
-    state.p1Cursor = i1; state.p2Cursor = i2;
-    state.phase = 'lobby';
-    return;
-  }
-  if (state.phase === 'charSelect') {
-    if (k === 's') { state.p1Cursor = (state.p1Cursor + 1) % 16; return; }
-    if (k === 'a') { state.p1Cursor = (state.p1Cursor + 15) % 16; return; }
-    if (k === 'l') { state.p2Cursor = (state.p2Cursor + 1) % 16; return; }
-    if (k === 'k') { state.p2Cursor = (state.p2Cursor + 15) % 16; return; }
-    if (k === ' ') { state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby'; return; }
-    return;
-  }
-  if (k === ' ' && state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
-  if (state.phase === 'nameEntry') {
-    const ne = nameEntryState;
-    const ch = k.length === 1 && /[a-z0-9]/i.test(k) ? k.toUpperCase() : null;
-    if (ch) {
-      ne.letters[ne.cursor] = ch;
-      if (ne.cursor < 9) { ne.cursor++; } else { submitNameEntry(); }
-      return;
-    }
-    if (k === 'backspace') {
-      if (ne.cursor > 0) { ne.cursor--; ne.letters[ne.cursor] = '_'; } return;
-    }
-    if (k === ' ' || k === 'enter') { submitNameEntry(); return; }
-    return;
-  }
-  if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
-  if ((k === ' ') && state.phase === 'lobby') { startCountdown(); return; }
-  if (state.phase !== 'playing') return;
-  if (k === 'a') onTap(1);
-  if (k === 'l') onTap(2);
-});
+// Keyboard/mouse/touch events are now dispatched via inputBus (see src/input/)
 
 const _canvas = document.getElementById('c');
 
-function canvasCoords(e: { clientX: number; clientY: number }) {
-  const { x: mx, y: my } = clientToCanvas(e.clientX, e.clientY);
-  return { mx, my };
-}
 function inRect(mx, my, rect) {
   return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
 }
@@ -161,26 +113,132 @@ function submitNameEntry() {
   state.phase = 'leaderboard';
 }
 
-_canvas.addEventListener('click', e => {
-  const { mx, my } = canvasCoords(e);
-  if (state.phase !== 'charSelect' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
-  if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; return; }
-  if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; return; }
-  if (state.phase === 'lobby') startCountdown();
+// ── InputBus subscriber ───────────────────────────────────────────────────────
+inputBus.subscribe((action: GameAction) => {
+  switch (action.type) {
+    case 'escape': {
+      if (state.phase === 'charSelect') return;
+      if (state.phase === 'nameEntry') { state.phase = 'leaderboard'; return; }
+      if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
+      const i1 = state.p1Icon, i2 = state.p2Icon;
+      initState();
+      state.p1Icon = i1; state.p2Icon = i2;
+      state.p1Cursor = i1; state.p2Cursor = i2;
+      state.phase = 'lobby';
+      return;
+    }
+    case 'restart': {
+      if (state.phase !== 'gameOver') return;
+      const i1 = state.p1Icon, i2 = state.p2Icon;
+      initState();
+      state.p1Icon = i1; state.p2Icon = i2;
+      state.p1Cursor = i1; state.p2Cursor = i2;
+      state.phase = 'lobby';
+      return;
+    }
+    case 'confirm': {
+      if (state.phase === 'charSelect') {
+        state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby'; return;
+      }
+      if (state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
+      if (state.phase === 'nameEntry') { submitNameEntry(); return; }
+      if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
+      if (state.phase === 'lobby') { startCountdown(); return; }
+      return;
+    }
+    case 'tap': {
+      if (state.phase === 'playing') onTap(action.player);
+      return;
+    }
+    case 'navigate': {
+      if (state.phase !== 'charSelect') return;
+      if (action.player === 1) {
+        if (action.direction === 'next') state.p1Cursor = (state.p1Cursor + 1) % 16;
+        else                             state.p1Cursor = (state.p1Cursor + 15) % 16;
+      } else {
+        if (action.direction === 'next') state.p2Cursor = (state.p2Cursor + 1) % 16;
+        else                             state.p2Cursor = (state.p2Cursor + 15) % 16;
+      }
+      return;
+    }
+    case 'nameChar': {
+      if (state.phase !== 'nameEntry') return;
+      const ch = /^[A-Z0-9]$/.test(action.char) ? action.char : null;
+      if (!ch) return;
+      const ne = nameEntryState;
+      ne.letters[ne.cursor] = ch;
+      if (ne.cursor < 9) { ne.cursor++; } else { submitNameEntry(); }
+      return;
+    }
+    case 'nameBackspace': {
+      if (state.phase !== 'nameEntry') return;
+      const ne = nameEntryState;
+      if (ne.cursor > 0) { ne.cursor--; ne.letters[ne.cursor] = '_'; }
+      return;
+    }
+    case 'nameSubmit': {
+      if (state.phase === 'nameEntry') submitNameEntry();
+      return;
+    }
+    case 'click': {
+      const { x: mx, y: my } = action;
+      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
+      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && inRect(mx, my, ESC_BTN)) {
+        const i1 = state.p1Icon, i2 = state.p2Icon;
+        if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
+        initState(); state.p1Icon = i1; state.p2Icon = i2;
+        state.p1Cursor = i1; state.p2Cursor = i2; state.phase = 'lobby'; return;
+      }
+      if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; return; }
+      if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; return; }
+      if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
+      if (state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
+      if (state.phase === 'nameEntry') {
+        const ne = nameEntryState;
+        const ALPHA_FULL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        if (my > H - 60) {
+          submitNameEntry();
+        } else if (mx < W / 2) {
+          if (ne.cursor > 0) { ne.cursor--; }
+        } else {
+          const cur = ne.letters[ne.cursor] === '_' ? -1 : ALPHA_FULL.indexOf(ne.letters[ne.cursor]);
+          ne.letters[ne.cursor] = ALPHA_FULL[(cur + 1) % ALPHA_FULL.length];
+          if (ne.cursor < 9) ne.cursor++;
+          else submitNameEntry();
+        }
+        return;
+      }
+      if (state.phase === 'charSelect') {
+        const csGridY = Math.round((H - 272) / 2) + 10;
+        if (my > csGridY + 272 - 10) {
+          state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby';
+        } else if (mx < W / 2) {
+          state.p1Cursor = (state.p1Cursor + 1) % 16;
+        } else {
+          state.p2Cursor = (state.p2Cursor + 1) % 16;
+        }
+        return;
+      }
+      if (state.phase === 'gameOver') {
+        const i1 = state.p1Icon, i2 = state.p2Icon;
+        initState();
+        state.p1Icon = i1; state.p2Icon = i2;
+        state.p1Cursor = i1; state.p2Cursor = i2;
+        state.phase = 'lobby';
+        return;
+      }
+      if (state.phase === 'lobby') startCountdown();
+      return;
+    }
+    case 'hover': {
+      if (action.target === 'lobby')  lobbyHover  = action.active;
+      if (action.target === 'change') changeHover = action.active;
+      _canvas.style.cursor = (changeHover || lobbyHover) ? 'pointer' : 'default';
+      return;
+    }
+  }
 });
-_canvas.addEventListener('mousemove', e => {
-  const { mx, my } = canvasCoords(e);
-  // Change players button (all non-charSelect phases)
-  changeHover = state.phase !== 'charSelect' && inRect(mx, my, CHANGE_BTN);
-  // Lobby press-start hover
-  lobbyHover = state.phase === 'lobby' && inRect(mx, my, LOBBY_BTN);
-  _canvas.style.cursor = (changeHover || lobbyHover) ? 'pointer' : 'default';
-});
-_canvas.addEventListener('mouseleave', () => {
-  lobbyHover = false;
-  changeHover = false;
-  _canvas.style.cursor = 'default';
-});
+
 function onTap(player) {
   const idx = player - 1;
   // Freeze effect: this player's taps do nothing
@@ -1349,10 +1407,6 @@ function drawLobby() {
 }
 
 // ── Draw: change players button (top-left) ────────────────────────────────────
-const CHANGE_BTN = { x: 8, y: 8, w: 0, h: 16 }; // w set dynamically
-const ESC_BTN    = { x: 0, y: 8, w: 0, h: 16 }; // x/w set dynamically
-let changeHover = false;
-
 function drawChangeBtn() {
   const PAD = 8, by = CHANGE_BTN.y, bh = CHANGE_BTN.h;
   ctx.font = '6px "Press Start 2P", monospace';
@@ -1615,65 +1669,5 @@ window.addEventListener('orientationchange', () => {
 
 // ── Touch input (mobile) ──────────────────────────────────────────────────────
 const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-
-_canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  for (const touch of e.changedTouches) {
-    const { x: mx, y: my } = clientToCanvas(touch.clientX, touch.clientY);
-    // Check overlay buttons first (work in any phase)
-    if (state.phase === 'lobby' && inRect(mx, my, HOW_BTN)) { howToPlayFrom = 'lobby'; state.phase = 'howToPlay'; continue; }
-    if (state.phase === 'lobby' && inRect(mx, my, HS_BTN)) { lbNewName = null; state.phase = 'leaderboard'; continue; }
-    if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); continue; }
-    if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && inRect(mx, my, ESC_BTN)) {
-      const i1 = state.p1Icon, i2 = state.p2Icon;
-      if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
-      initState(); state.p1Icon = i1; state.p2Icon = i2;
-      state.p1Cursor = i1; state.p2Cursor = i2; state.phase = 'lobby'; continue;
-    }
-    const isLeft = mx < W / 2;
-    if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
-    if (state.phase === 'nameEntry') {
-      const ne = nameEntryState;
-      const ALPHA_FULL = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      if (my > H - 60) { // bottom confirm strip
-        submitNameEntry();
-      } else if (isLeft) {
-        // left tap = go back one cursor position
-        if (ne.cursor > 0) { ne.cursor--; }
-      } else {
-        // right tap = cycle current letter forward, then advance cursor
-        const cur = ne.letters[ne.cursor] === '_' ? -1 : ALPHA_FULL.indexOf(ne.letters[ne.cursor]);
-        ne.letters[ne.cursor] = ALPHA_FULL[(cur + 1) % ALPHA_FULL.length];
-        if (ne.cursor < 9) ne.cursor++;
-        else submitNameEntry();
-      }
-      continue;
-    }
-    if (state.phase === 'howToPlay') {
-      storage.setSeenHowTo(); state.phase = howToPlayFrom; continue;
-    } else if (state.phase === 'playing') {
-      if (isLeft) onTap(1); else onTap(2);
-    } else if (state.phase === 'lobby') {
-      startCountdown();
-    } else if (state.phase === 'charSelect') {
-      const { x: tmx, y: tmy } = clientToCanvas(touch.clientX, touch.clientY);
-      const csGridY = Math.round((H - 272) / 2) + 10;
-      if (tmy > csGridY + 272 - 10) {
-        // tap in bottom confirm strip → confirm selection
-        state.p1Icon = state.p1Cursor; state.p2Icon = state.p2Cursor; state.phase = 'lobby';
-      } else if (tmx < W / 2) {
-        state.p1Cursor = (state.p1Cursor + 1) % 16;
-      } else {
-        state.p2Cursor = (state.p2Cursor + 1) % 16;
-      }
-    } else if (state.phase === 'gameOver') {
-      const i1 = state.p1Icon, i2 = state.p2Icon;
-      initState();
-      state.p1Icon = i1; state.p2Icon = i2;
-      state.p1Cursor = i1; state.p2Cursor = i2;
-      state.phase = 'lobby';
-    }
-  }
-}, { passive: false });
 
 requestAnimationFrame(loop);
