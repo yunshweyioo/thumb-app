@@ -17,6 +17,9 @@ import { scoreScale, triggerScorePop, tickScorePop, resetScorePop } from './vfx/
 import { rhythmTracker } from './rhythm/RhythmTracker.ts';
 import { sfxTap, sfxCountdown, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
 import { spIdx } from './audio/AudioEngine.ts';
+import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
+         spawnPowerUp, collectPowerUp, tickPowerUp,
+         drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
 
 let howToPlayFrom  = 'charSelect'; // where to return after dismissing howToPlay
 const ALPHA        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -54,100 +57,9 @@ const BOOT_LINE_DELAY = 0.18;
 
 const lastComboShow = [0, 0];
 
-// ── Power-ups ─────────────────────────────────────────────────────────────────
-const PU_TYPES = [
-  { id: 'speed',  label: 'SPD', col: '#ffee00', desc: 'SPEED UP!',   dur: 4.0 },
-  { id: 'reverse', label: 'REV', col: '#ff4444', desc: 'REVERSE!',   dur: 2.5 },
-  { id: 'freeze', label: 'FRZ', col: '#88ffee', desc: 'FREEZE!',     dur: 2.5 },
-];
-let powerUp = null;   // { pos: -1..1, typeIdx, age }
-let puSpawnTimer = 5;
-const puEffects = [{ id: null, timer: 0 }, { id: null, timer: 0 }];
-
-function spawnPowerUp() {
-  const sign = Math.random() > 0.5 ? 1 : -1;
-  const pos  = sign * (0.15 + Math.random() * 0.55);
-  powerUp = { pos, typeIdx: Math.floor(Math.random() * PU_TYPES.length), age: 0 };
-}
-function collectPowerUp(player) {
-  if (!powerUp) return;
-  const pu  = PU_TYPES[powerUp.typeIdx];
-  const idx = player - 1;
-  puEffects[idx] = { id: pu.id, timer: pu.dur };
-  const col = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
-  const px  = BAR_CX + powerUp.pos * BAR_HALF;
-  addPuText(pu.desc, px, BAR_Y - 28, pu.col);
-  addFlash(pu.col, 0.28);
-  powerUp = null;
-  puSpawnTimer = 4 + Math.random() * 2;
-}
-function tickPowerUp(dt) {
-  puSpawnTimer -= dt;
-  if (!powerUp && puSpawnTimer <= 0) { spawnPowerUp(); puSpawnTimer = 4 + Math.random() * 2; }
-  if (powerUp) {
-    powerUp.age += dt;
-    if (Math.abs(state.balance - powerUp.pos) < 0.055) {
-      collectPowerUp(powerUp.pos > 0 ? 1 : 2);
-    }
-  }
-  for (const e of puEffects) { if (e.timer > 0) e.timer -= dt; }
-}
-function drawPowerUp() {
-  if (!powerUp) return;
-  const pu  = PU_TYPES[powerUp.typeIdx];
-  const t   = performance.now() * 0.001;
-  const px  = BAR_CX + powerUp.pos * BAR_HALF;
-  const bob = Math.sin(t * 4.5) * 4;
-  const pulse = 0.65 + 0.35 * Math.sin(t * 5.5);
-
-  ctx.save();
-  ctx.shadowColor = pu.col; ctx.shadowBlur = 18 * pulse;
-  ctx.beginPath();
-  ctx.moveTo(px,      BAR_Y - 13 + bob);
-  ctx.lineTo(px + 9,  BAR_Y      + bob);
-  ctx.lineTo(px,      BAR_Y + 13 + bob);
-  ctx.lineTo(px - 9,  BAR_Y      + bob);
-  ctx.closePath();
-  ctx.fillStyle = hexAlpha(pu.col, 0.82 * pulse);
-  ctx.fill();
-  ctx.strokeStyle = pu.col; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.shadowBlur = 0;
-  ctx.font = '5px "Press Start 2P", monospace';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#000';
-  ctx.fillText(pu.label, px, BAR_Y + bob);
-  ctx.restore();
-}
-
-
 // ── Lobby idle tracking ────────────────────────────────────────────────────────
 let lobbyEnteredTime = 0;
 let prevPhase = null;
-
-// ── Active effect HUD helper ───────────────────────────────────────────────────
-function drawEffectHud() {
-  [0, 1].forEach(idx => {
-    const e = puEffects[idx];
-    if (!e.id || e.timer <= 0) return;
-    const pu  = PU_TYPES.find(p => p.id === e.id);
-    const px  = idx === 0 ? 140 : W - 140;
-    const py  = BAR_Y + 76;
-    const frac = e.timer / pu.dur;
-    ctx.save();
-    ctx.shadowColor = pu.col; ctx.shadowBlur = 10 * frac;
-    ctx.font = '6px "Press Start 2P", monospace';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillStyle = pu.col;
-    ctx.fillText(pu.label, px, py);
-    // tiny timer bar
-    const bw = 40, bh = 4;
-    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw, bh);
-    ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
-    ctx.beginPath(); ctx.rect(px - bw/2, py + 9, bw * frac, bh);
-    ctx.fillStyle = pu.col; ctx.fill();
-    ctx.restore();
-  });
-}
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let state: GameState = initGameState();
