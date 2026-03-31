@@ -34,11 +34,15 @@ export class TugOfWarMode extends GameMode {
 
   balance = 0;
   roundTimer = ROUND_TIME;
+  private tapStep    = TAP_STEP;
+  private driftSpeed = DRIFT_SPD;
   private lastComboShow = [0, 0];
 
   init(gameState: GameState, config?: Record<string, unknown>): void {
-    this.balance = 0;
-    this.roundTimer = (config?.roundTime as number) ?? ROUND_TIME;
+    this.balance    = 0;
+    this.roundTimer = (config?.roundTime  as number) ?? ROUND_TIME;
+    this.tapStep    = (config?.tapStep    as number) ?? TAP_STEP;
+    this.driftSpeed = (config?.driftSpeed as number) ?? DRIFT_SPD;
     gameState.tapCount = [0, 0];
   }
 
@@ -62,7 +66,7 @@ export class TugOfWarMode extends GameMode {
     const sinceAnyTap = now - Math.max(rhythmTracker.lastTapTime[0], rhythmTracker.lastTapTime[1]);
     const idleBoost   = sinceAnyTap > 250 ? 1 + Math.min(4, (sinceAnyTap - 250) / 200) : 1;
 
-    const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
+    const drift = this.driftSpeed * tugBoost * idleBoost * dt;
     if      (this.balance > 0) this.balance = Math.max(0, this.balance - drift);
     else if (this.balance < 0) this.balance = Math.min(0, this.balance + drift);
 
@@ -101,7 +105,7 @@ export class TugOfWarMode extends GameMode {
     const orbX = BAR_CX + this.balance * BAR_HALF;
     // Speed boost effect
     const speedMult = (puEffects[idx].id === 'speed' && puEffects[idx].timer > 0) ? 1.6 : 1;
-    const step = TAP_STEP * (1 + rhythmTracker.rhythmBonus[idx] * 0.6) * speedMult;
+    const step = this.tapStep * (1 + rhythmTracker.rhythmBonus[idx] * 0.6) * speedMult;
     const oppIdx = 1 - idx;
     const reversed = puEffects[oppIdx].id === 'reverse' && puEffects[oppIdx].timer > 0;
     if (player === 1) this.balance = reversed ? Math.max(-1, this.balance - step) : Math.min( 1, this.balance + step);

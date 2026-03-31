@@ -23,6 +23,7 @@ import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
          drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
 import { getCanvasScale, clientToCanvas } from './mobile/MobileScale.ts';
 import { TugOfWarMode } from './modes/TugOfWarMode.ts';
+import type { GameMode } from './modes/GameMode.ts';
 import { modeRegistry } from './modes/ModeRegistry.ts';
 import { inputBus, GameAction } from './input/InputBus.ts';
 import './input/KeyboardInput.ts';
@@ -45,7 +46,7 @@ let lobbyEnteredTime = 0;
 let prevPhase = null;
 
 // ── Active game mode ──────────────────────────────────────────────────────────
-let activeMode: TugOfWarMode;
+let activeMode: GameMode;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let state: GameState = initGameState();
@@ -267,7 +268,7 @@ function loop(ts) {
         const w = result.won;
         state.scores[w - 1]++;
         state.phase = 'roundEnd'; state.roundWinner = w; state.reTimer = 3.2;
-        const orbX = BAR_CX + activeMode.balance * BAR_HALF;
+        const orbX = BAR_CX + (activeMode.getHudData(state).balance as number) * BAR_HALF;
         const winColor = w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
         burst(winColor, orbX, true); burst(winColor, orbX, true);
         addShake(1.2); addFlash(winColor, 0.6);
