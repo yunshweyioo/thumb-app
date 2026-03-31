@@ -141,12 +141,9 @@ document.addEventListener('keydown', e => {
 
 const _canvas = document.getElementById('c');
 
-function canvasCoords(e) {
-  const r = _canvas.getBoundingClientRect();
-  return {
-    mx: (e.clientX - r.left) * (W / r.width),
-    my: (e.clientY - r.top)  * (H / r.height),
-  };
+function canvasCoords(e: { clientX: number; clientY: number }) {
+  const { x: mx, y: my } = clientToCanvas(e.clientX, e.clientY);
+  return { mx, my };
 }
 function inRect(mx, my, rect) {
   return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
@@ -1633,8 +1630,7 @@ _canvas.addEventListener('touchstart', e => {
       initState(); state.p1Icon = i1; state.p2Icon = i2;
       state.p1Cursor = i1; state.p2Cursor = i2; state.phase = 'lobby'; continue;
     }
-    const midX = r.left + r.width / 2;
-    const isLeft = touch.clientX < midX;
+    const isLeft = mx < W / 2;
     if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; continue; }
     if (state.phase === 'nameEntry') {
       const ne = nameEntryState;
