@@ -1,7 +1,8 @@
 import { ctx, W, H } from '../canvas.ts';
 import { LOBBY_BTN, HOW_BTN, HS_BTN } from '../constants.ts';
 import { hexAlpha, txt, glowTxt } from './CanvasUtils.ts';
-import { drawAlienSprite, alienAnim, ALIENS } from '../sprites/AlienSprites.ts';
+import { drawAlienSprite, alienAnim } from '../sprites/AlienSprites.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 import type { GameState } from '../state/GameState.ts';
 import type { IStorageManager } from '../storage/StorageManager.ts';
 
@@ -37,7 +38,7 @@ export function drawCharSelect(state: GameState, p1Color: string, p2Color: strin
   [1, 2].forEach(p => {
     const gx     = p === 1 ? p1gx : p2gx;
     const cursor = p === 1 ? state.p1Cursor : state.p2Cursor;
-    const pc     = ALIENS[cursor].c;
+    const pc     = themeManager.getAliens()[cursor].c;
     const prevKey = p === 1 ? 'A' : 'K';
     const nextKey = p === 1 ? 'S' : 'L';
 
@@ -107,7 +108,7 @@ export function drawCharSelect(state: GameState, p1Color: string, p2Color: strin
       if (sel) {
         const t = performance.now() * 0.001;
         const { dx, dy, sx, sy, rot } = alienAnim(i, t);
-        ctx.shadowColor = ALIENS[i].c; ctx.shadowBlur = 20;
+        ctx.shadowColor = themeManager.getAliens()[i].c; ctx.shadowBlur = 20;
         ctx.translate(cx + dx, cy + dy);
         if (rot) ctx.rotate(rot);
         ctx.scale(sx, sy);

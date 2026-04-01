@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "difficulty": "medium",
+  "description": "5–8 letter common words",
+  "words": [
+    "typing", "faster", "battle", "winner", "player", "attack",
+    "keypad", "sprint", "arcade", "blazing", "method", "system",
+    "rocket", "master", "energy", "impact", "strike", "combat"
+  ]
+}

@@ -1,10 +1,6 @@
 import { getAC, spIdx } from './AudioEngine.ts';
 import { rhythmTracker } from '../rhythm/RhythmTracker.ts';
-
-// Scott Pilgrim style — cycling chiptune hit sounds, pitch scales with tap speed
-const SP_SCALES = [
-  [1, 1.5], [1.25, 1.78], [1.5, 2], [1.12, 1.68], [0.89, 1.33], [1.33, 1.78],
-];
+import { themeManager } from '../theme/ThemeManager.ts';
 
 let pinTone: { o: OscillatorNode; g: GainNode } | null = null;
 
@@ -14,7 +10,9 @@ export function sfxTap(player: 1 | 2): void {
     const t   = a.currentTime;
     const tps = rhythmTracker.getTPS(player);
     // Base pitch: P1 higher/brighter, P2 lower/punchier
-    const root  = player === 1 ? 587 : 440;  // D5 vs A4
+    const audio = themeManager.get().audio;
+    const root  = player === 1 ? (audio.p1RootHz ?? 587) : (audio.p2RootHz ?? 440);
+    const SP_SCALES = audio.scales ?? [[1,1.5],[1.25,1.78],[1.5,2],[1.12,1.68],[0.89,1.33],[1.33,1.78]];
     const boost = 1 + Math.min(tps / 20, 0.3);  // pitch creeps up when spamming fast
     const [r1, r2] = SP_SCALES[spIdx[player-1] % SP_SCALES.length];
     spIdx[player-1]++;

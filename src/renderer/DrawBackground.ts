@@ -1,26 +1,36 @@
 import { ctx, W, H } from '../canvas.ts';
 import { hexAlpha } from './CanvasUtils.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 // Deterministic star positions (seeded from sin hash, not Math.random)
-export const BG_STARS: Array<[number, number, number]> = Array.from({ length: 90 }, (_, i) => {
-  const rng = Math.sin(i * 127.1 + 311.7) * 43758.5453;
-  const x   = (rng - Math.floor(rng)) * W;
-  const rng2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
-  const y   = (rng2 - Math.floor(rng2)) * H;
-  const rng3 = Math.sin(i * 419.2 + 77.1) * 43758.5453;
-  const f   = rng3 - Math.floor(rng3);
-  const s   = f < 0.15 ? 3 : f < 0.45 ? 2 : 1;
-  return [Math.round(x), Math.round(y), s] as [number, number, number];
-});
+// Lazy — generated on first use so themeManager.load() has been called by then
+let _bgStars: Array<[number, number, number]> | null = null;
+
+function getBgStars(): Array<[number, number, number]> {
+  if (!_bgStars) {
+    const count = themeManager.get().background?.starCount ?? 90;
+    _bgStars = Array.from({ length: count }, (_, i) => {
+      const rng = Math.sin(i * 127.1 + 311.7) * 43758.5453;
+      const x   = (rng - Math.floor(rng)) * W;
+      const rng2 = Math.sin(i * 269.5 + 183.3) * 43758.5453;
+      const y   = (rng2 - Math.floor(rng2)) * H;
+      const rng3 = Math.sin(i * 419.2 + 77.1) * 43758.5453;
+      const f   = rng3 - Math.floor(rng3);
+      const s   = f < 0.15 ? 3 : f < 0.45 ? 2 : 1;
+      return [Math.round(x), Math.round(y), s] as [number, number, number];
+    });
+  }
+  return _bgStars;
+}
 
 export function drawBg(balance: number, p1Color: string, p2Color: string): void {
   // Clean dark fill
-  ctx.fillStyle = 'rgba(8, 4, 28, 0.92)';
+  ctx.fillStyle = themeManager.get().colors.bg;
   ctx.fillRect(0, 0, W, H);
 
   // Pixel stars
-  ctx.fillStyle = '#ffffff';
-  for (const [sx, sy, ss] of BG_STARS) {
+  ctx.fillStyle = themeManager.get().colors.starColor;
+  for (const [sx, sy, ss] of getBgStars()) {
     ctx.fillRect(sx, sy, ss, ss);
   }
 
