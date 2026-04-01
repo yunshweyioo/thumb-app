@@ -1,11 +1,6 @@
 import { ctx } from '../canvas.ts';
 import { themeManager } from '../theme/ThemeManager.ts';
 
-// SHAPES and ALIENS are now in retro.theme.json — read via themeManager
-// Re-exported for backwards-compat with any direct imports
-export const SHAPES = themeManager.getShapes();
-export const ALIENS = themeManager.getAliens();
-
 // New helper — replaces P1C() and P2C()
 export function getAlienColor(idx: number): string {
   const aliens = themeManager.getAliens();

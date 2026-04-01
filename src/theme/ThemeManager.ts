@@ -17,6 +17,8 @@ export class ThemeManager {
     if (!t.colors)                        throw new Error('Theme missing colors');
     if (typeof (t.colors as any).bg !== 'string')
                                           throw new Error('Theme missing colors.bg');
+    if (typeof (t.fonts as any)?.main !== 'string')
+                                          throw new Error('Theme missing fonts.main');
     if (!t.sprites)                       throw new Error('Theme missing sprites');
     if (!Array.isArray((t.sprites as any).aliens))
                                           throw new Error('Theme sprites.aliens must be an array');

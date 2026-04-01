@@ -9,7 +9,7 @@ import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './renderer/CanvasUtils.ts';
 import { storage } from './storage/StorageManager.ts';
 import { GameState, initGameState, cloneGameState } from './state/GameState.ts';
-import { SHAPES, ALIENS, getAlienColor, alienAnim, drawAlienSprite } from './sprites/AlienSprites.ts';
+import { getAlienColor, alienAnim, drawAlienSprite } from './sprites/AlienSprites.ts';
 import { burst, tickParticles, drawParticles, resetParticles } from './vfx/Particles.ts';
 import { shakeAmt, flashAlpha, flashCol, orbBounce, orbVelX, coinAngle, orbitAngle, orbTrail,
          addShake, tickShake, getShakeOffset, addFlash, tickFlash,
