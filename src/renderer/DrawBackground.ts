@@ -16,7 +16,7 @@ export const BG_STARS: Array<[number, number, number]> = Array.from({ length: 90
 
 export function drawBg(balance: number, p1Color: string, p2Color: string): void {
   // Clean dark fill
-  ctx.fillStyle = 'rgba(8, 4, 28, 0.92)';
+  ctx.fillStyle = themeManager.get().colors.bg;
   ctx.fillRect(0, 0, W, H);
 
   // Pixel stars

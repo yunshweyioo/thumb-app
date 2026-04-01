@@ -1,6 +1,7 @@
 import { ctx, W } from '../canvas.ts';
 import { BAR_Y, METER_SEGS, METER_H, METER_W, METER_GAP, SEG_H } from '../constants.ts';
 import { hexAlpha, glowTxt } from '../renderer/CanvasUtils.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 export class RhythmTracker {
   tapHistory: [number[], number[]] = [[], []];
@@ -67,13 +68,14 @@ export class RhythmTracker {
     const PAD  = 4; // casing padding
 
     // Segment colour ramp: green → yellow-green → yellow → orange → red
+    const meterFill = themeManager.get().colors.meterFill;
     function segColor(frac: number): string {
-      if (frac <= 0.20) return '#22dd22';
-      if (frac <= 0.40) return '#88dd00';
-      if (frac <= 0.58) return '#ddcc00';
-      if (frac <= 0.75) return '#ffaa00';
-      if (frac <= 0.88) return '#ff5500';
-      return '#ff1100';
+      if (frac <= 0.20) return meterFill[0];
+      if (frac <= 0.40) return meterFill[1];
+      if (frac <= 0.58) return meterFill[2];
+      if (frac <= 0.75) return meterFill[3];
+      if (frac <= 0.88) return meterFill[4];
+      return meterFill[5];
     }
 
     // Outer casing
