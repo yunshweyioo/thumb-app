@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "difficulty": "easy",
+  "description": "Common 3–5 letter words",
+  "words": [
+    "the", "and", "run", "tap", "win", "hit", "go", "yes", "up",
+    "key", "game", "fast", "type", "play", "word", "red", "blue",
+    "stop", "wait", "now", "fire", "ice", "aim", "score", "beat"
+  ]
+}
