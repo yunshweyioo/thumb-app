@@ -16,6 +16,7 @@ import { scoreScale } from '../vfx/ScorePop.ts';
 import { getAlienColor } from '../sprites/AlienSprites.ts';
 import type { GameState } from '../state/GameState.ts';
 import type { IStorageManager } from '../storage/StorageManager.ts';
+import type { HudData } from '../modes/GameMode.ts';
 
 export interface RenderContext {
   state: GameState;
@@ -26,6 +27,7 @@ export interface RenderContext {
   changeHover: boolean;
   lbNewName: string | null;
   nameEntryState: NameEntryState;
+  hudData?: HudData;  // optional so it doesn't break existing call sites during transition
 }
 
 export function draw(rc: RenderContext): void {
@@ -40,7 +42,8 @@ export function draw(rc: RenderContext): void {
     return;
   }
 
-  drawBg(state.balance, rc.p1Color, rc.p2Color);
+  const balance = (rc.hudData?.balance as number) ?? state.balance;
+  drawBg(balance, rc.p1Color, rc.p2Color);
 
   if (state.phase === 'howToPlay') {
     drawHowToPlay();
@@ -71,14 +74,15 @@ export function draw(rc: RenderContext): void {
   drawScore(state, rc.p1Color, rc.p2Color, scoreScale);
   rhythmTracker.drawMeter(1, rc.p1Color, rc.p2Color);
   rhythmTracker.drawMeter(2, rc.p1Color, rc.p2Color);
-  drawBar(state.balance, rc.p1Color, rc.p2Color, orbBounce, orbVelX, coinAngle, orbitAngle, orbTrail, state.tapFlash);
+  drawBar(balance, rc.p1Color, rc.p2Color, orbBounce, orbVelX, coinAngle, orbitAngle, orbTrail, state.tapFlash);
   drawPlayers(state, rc.p1Color, rc.p2Color, [rhythmTracker.getTPS(1), rhythmTracker.getTPS(2)]);
   drawParticles();
 
   if (state.phase === 'lobby') {
     drawLobby(state, rc.storage, rc.lobbyHover, rc.p1Color, rc.p2Color);
   } else if (state.phase === 'playing') {
-    drawRoundTimer(state.roundTimer);
+    const roundTimer = (rc.hudData?.roundTimer as number) ?? state.roundTimer;
+    drawRoundTimer(roundTimer);
   } else if (state.phase === 'countdown') {
     drawCountdown(state);
   } else if (state.phase === 'roundEnd') {

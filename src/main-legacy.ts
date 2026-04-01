@@ -15,13 +15,18 @@ import { addComboText, tickComboTexts, drawComboTexts,
          addPuText, tickPuTexts, drawPuTexts, resetFloatTexts } from './vfx/FloatTexts.ts';
 import { scoreScale, triggerScorePop, tickScorePop, resetScorePop } from './vfx/ScorePop.ts';
 import { rhythmTracker } from './rhythm/RhythmTracker.ts';
-import { sfxTap, sfxCountdown, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
+import { sfxTap, sfxWin, startPinTone, updatePinTone, stopPinTone } from './audio/ChiptuneAudio.ts';
+import { phaseController } from './state/PhaseController.ts';
 import { spIdx } from './audio/AudioEngine.ts';
 import { PU_TYPES, puEffects, getPuEffects, getActivePU, resetPowerUps,
          spawnPowerUp, collectPowerUp, tickPowerUp,
          drawPowerUp, drawEffectHud } from './powerups/PowerUpSystem.ts';
 import { getCanvasScale, clientToCanvas } from './mobile/MobileScale.ts';
+import { TugOfWarMode } from './modes/TugOfWarMode.ts';
+import type { GameMode } from './modes/GameMode.ts';
+import { modeRegistry } from './modes/ModeRegistry.ts';
 import { inputBus, GameAction } from './input/InputBus.ts';
+import { LocalTransport } from './transport/LocalTransport.ts';
 import './input/KeyboardInput.ts';
 import './input/MouseInput.ts';
 import './input/TouchInput.ts';
@@ -37,35 +42,43 @@ let lbNewName      = null; // name to highlight after entry
 let lobbyHover  = false;
 let changeHover = false;
 
-const lastComboShow = [0, 0];
-
 // ── Lobby idle tracking ────────────────────────────────────────────────────────
 let lobbyEnteredTime = 0;
 let prevPhase = null;
+
+// ── Active game mode ──────────────────────────────────────────────────────────
+let activeMode: GameMode;
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let state: GameState = initGameState();
 function initState() {
   state = initGameState();
-  state.cdTimer = 1.0; state.cdScale = 1.6;
   resetParticles();
   resetScreenEffects();
   resetScorePop();
   rhythmTracker.reset();
   spIdx[0] = spIdx[1] = 0;
   resetFloatTexts();
-  lastComboShow[0] = lastComboShow[1] = 0;
   resetPowerUps();
+  if (activeMode) activeMode.init(state, activeMode.defaultConfig);
 }
+modeRegistry.register(TugOfWarMode);
+activeMode = new TugOfWarMode();
 initState();
 
 
+// ── Transport ─────────────────────────────────────────────────────────────────
+const [p1Transport] = LocalTransport.pair();
+p1Transport.connect('local', 'p1');  // fire-and-forget (resolves immediately)
+
+// When a message arrives from the transport (future remote use):
+p1Transport.on('message', (msg) => {
+  if (msg.event === 'tap') {
+    inputBus.dispatch({ type: 'tap', player: (msg.payload as { player: 1 | 2 }).player });
+  }
+});
+
 // ── Input ─────────────────────────────────────────────────────────────────────
-function startCountdown() {
-  state.balance = 0;
-  state.phase = 'countdown';
-  state.countdown = 3; state.cdTimer = 1.0; state.cdScale = 1.6;
-}
 
 // Keyboard/mouse/touch events are now dispatched via inputBus (see src/input/)
 
@@ -73,11 +86,6 @@ const _canvas = document.getElementById('c');
 
 function inRect(mx, my, rect) {
   return mx >= rect.x && mx <= rect.x + rect.w && my >= rect.y && my <= rect.y + rect.h;
-}
-function goToCharSelect() {
-  state.p1Cursor = state.p1Icon;
-  state.p2Cursor = state.p2Icon;
-  state.phase = 'charSelect';
 }
 function submitNameEntry() {
   const ne = nameEntryState;
@@ -117,11 +125,11 @@ inputBus.subscribe((action: GameAction) => {
       if (state.phase === 'howToPlay') { storage.setSeenHowTo(); state.phase = howToPlayFrom; return; }
       if (state.phase === 'nameEntry') { submitNameEntry(); return; }
       if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
-      if (state.phase === 'lobby') { startCountdown(); return; }
+      if (state.phase === 'lobby') { phaseController.startCountdown(state); return; }
       return;
     }
     case 'tap': {
-      if (state.phase === 'playing') onTap(action.player);
+      if (state.phase === 'playing') activeMode.onInput(state, action.player, 'tap');
       return;
     }
     case 'navigate': {
@@ -156,7 +164,7 @@ inputBus.subscribe((action: GameAction) => {
     }
     case 'click': {
       const { x: mx, y: my } = action;
-      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { goToCharSelect(); return; }
+      if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && state.phase !== 'leaderboard' && inRect(mx, my, CHANGE_BTN)) { phaseController.goToCharSelect(state); return; }
       if (state.phase !== 'charSelect' && state.phase !== 'nameEntry' && inRect(mx, my, ESC_BTN)) {
         const i1 = state.p1Icon, i2 = state.p2Icon;
         if (state.phase === 'leaderboard') { state.phase = 'lobby'; lbNewName = null; return; }
@@ -201,7 +209,7 @@ inputBus.subscribe((action: GameAction) => {
         state.phase = 'lobby';
         return;
       }
-      if (state.phase === 'lobby') startCountdown();
+      if (state.phase === 'lobby') { phaseController.startCountdown(state); }
       return;
     }
     case 'hover': {
@@ -213,99 +221,7 @@ inputBus.subscribe((action: GameAction) => {
   }
 });
 
-function onTap(player) {
-  const idx = player - 1;
-  // Freeze effect: this player's taps do nothing
-  if (puEffects[idx].id === 'freeze' && puEffects[idx].timer > 0) return;
-
-  const orbX = BAR_CX + state.balance * BAR_HALF;
-  // Speed boost effect
-  const speedMult = (puEffects[idx].id === 'speed' && puEffects[idx].timer > 0) ? 1.6 : 1;
-  const step = TAP_STEP * (1 + rhythmTracker.rhythmBonus[idx] * 0.6) * speedMult;
-  const oppIdx = 1 - idx;
-  const reversed = puEffects[oppIdx].id === 'reverse' && puEffects[oppIdx].timer > 0;
-  if (player === 1) state.balance = reversed ? Math.max(-1, state.balance - step) : Math.min( 1, state.balance + step);
-  else              state.balance = reversed ? Math.min( 1, state.balance + step) : Math.max(-1, state.balance - step);
-  state.tapFlash[player-1] = 0.18;
-  state.tapCount[player-1]++;
-  state.totalTaps[player-1]++;
-  rhythmTracker.recordTap(player);
-  // Combo floating text
-  const now = performance.now();
-  if (rhythmTracker.rhythmBonus[idx] > 0.65 && now - lastComboShow[idx] > 700) {
-    const words = rhythmTracker.rhythmBonus[idx] > 0.9 ? 'PERFECT!' : rhythmTracker.rhythmBonus[idx] > 0.78 ? 'COMBO!' : 'NICE!';
-    const col   = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
-    addComboText(words, orbX + (player === 1 ? 44 : -44), BAR_Y - 32, col);
-    lastComboShow[idx] = now;
-  }
-  triggerOrbBounce();
-  setOrbVelX(Math.max(-1, Math.min(1, orbVelX + (player === 1 ? 0.7 : -0.7))));
-  rhythmTracker.spikeMe(player);
-  burst(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), orbX, false);
-  sfxTap(player);
-  // Instant win if orb reaches the opponent's end
-  if (state.balance >= 1.0) { winRound(1); return; }
-  if (state.balance <= -1.0) { winRound(2); return; }
-}
-
-// ── Game logic ────────────────────────────────────────────────────────────────
-function tickGame(dt) {
-  // Accumulate each player's personal active time (excludes freeze)
-  for (let idx = 0; idx < 2; idx++) {
-    if (!(puEffects[idx].id === 'freeze' && puEffects[idx].timer > 0))
-      state.timeActive[idx] += dt;
-  }
-  // Option E: tug zones — drift gets stronger past the 50% mark (comeback mechanic)
-  const absBal   = Math.abs(state.balance);
-  const tugBoost = absBal > 0.5 ? 1 + (absBal - 0.5) * 3.5 : 1;
-
-  // Idle boost — if both players have stopped tapping, ball snaps back faster
-  const now         = performance.now();
-  const sinceAnyTap = now - Math.max(rhythmTracker.lastTapTime[0], rhythmTracker.lastTapTime[1]);
-  const idleBoost   = sinceAnyTap > 250 ? 1 + Math.min(4, (sinceAnyTap - 250) / 200) : 1;
-
-  const drift = DRIFT_SPD * tugBoost * idleBoost * dt;
-  if      (state.balance > 0) state.balance = Math.max(0, state.balance - drift);
-  else if (state.balance < 0) state.balance = Math.min(0, state.balance + drift);
-  tickPowerUp(dt, state.balance);
-  tickComboTexts(dt);
-  tickPuTexts(dt);
-
-  // Round countdown
-  state.roundTimer -= dt;
-  if (state.roundTimer <= 5 && Math.floor(state.roundTimer + dt) > Math.floor(state.roundTimer)) {
-    addShake(0.2); // light shake each second in final 5s
-  }
-  if (state.roundTimer <= 0) {
-    // Whoever's side the orb is on wins; tap count breaks ties
-    if      (state.balance > 0.01)  winRound(1);
-    else if (state.balance < -0.01) winRound(2);
-    else    drawRound();
-    return;
-  }
-
-  state.tapFlash[0] = Math.max(0, state.tapFlash[0] - dt * 6);
-  state.tapFlash[1] = Math.max(0, state.tapFlash[1] - dt * 6);
-
-  const orbX = BAR_CX + state.balance * BAR_HALF;
-  pushTrail(orbX);
-  tickParticles(dt); tickOrb(dt); tickTrail(dt);
-  tickShake(dt); tickFlash(dt); tickScorePop(dt); rhythmTracker.tickMeters(dt);
-}
-function winRound(player) {
-  state.scores[player-1]++;
-  state.phase = 'roundEnd'; state.roundWinner = player; state.reTimer = 3.2;
-  const orbX = BAR_CX + state.balance * BAR_HALF;
-  const winColor = player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
-  burst(winColor, orbX, true); burst(winColor, orbX, true);
-  addShake(1.2); addFlash(player === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon), 0.6);
-  sfxWin(player); triggerScorePop(player);
-  if (state.scores[player-1] >= 2) storage.addWin(player);
-}
-function drawRound() {
-  state.phase = 'roundEnd'; state.roundWinner = 0; state.reTimer = 2.8;
-  addShake(0.5); addFlash('#888', 0.25);
-}
+// ── Game logic — onTap, tickGame, winRound, drawRound moved to TugOfWarMode ──
 function nextRound() {
   if (state.scores[0] >= 2 || state.scores[1] >= 2 || state.round >= 3) {
     const w = state.scores[0] > state.scores[1] ? 1 : state.scores[1] > state.scores[0] ? 2 : 0;
@@ -318,11 +234,11 @@ function nextRound() {
       state.phase = 'gameOver';
     }
   } else {
-    state.round++; state.balance = 0; state.tapCount = [0,0];
-    state.roundTimer = ROUND_TIME;
+    state.round++; state.tapCount = [0,0];
     state.phase = 'lobby';
     resetParticles(); orbTrail.length = 0;
     rhythmTracker.reset();
+    activeMode.init(state, activeMode.defaultConfig);
   }
 }
 
@@ -347,24 +263,37 @@ function loop(ts) {
   } else if (state.phase === 'lobby') {
     tickParticles(dt); tickShake(dt); tickFlash(dt);
   } else if (state.phase === 'countdown') {
-    state.cdTimer -= dt;
-    state.cdScale = Math.max(1, state.cdScale - dt * 4.5);
-    if (state.cdTimer <= 0) {
-      if (state.countdown > 1) {
-        state.countdown--; state.cdTimer = 1.0; state.cdScale = 1.6; sfxCountdown(false);
-      } else if (state.countdown === 1) {
-        state.countdown = 0; state.cdTimer = 0.6; state.cdScale = 1.6; sfxCountdown(true);
-      } else {
-        state.phase = 'playing'; state.tapCount = [0,0];
-      }
+    const phaseEvts = phaseController.tick(state, dt);
+    for (const ev of phaseEvts) {
+      if (ev.type === 'round_start') { state.tapCount = [0, 0]; }
     }
     tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt); rhythmTracker.tickMeters(dt);
   } else if (state.phase === 'playing') {
-    tickGame(dt);
+    const result = activeMode.tick(state, dt);
+    if (result.won !== null) {
+      if (result.won === 0) {
+        // draw
+        state.phase = 'roundEnd'; state.roundWinner = 0; state.reTimer = 2.8;
+        addShake(0.5); addFlash('#888', 0.25);
+      } else {
+        // player won
+        const w = result.won;
+        state.scores[w - 1]++;
+        state.phase = 'roundEnd'; state.roundWinner = w; state.reTimer = 3.2;
+        const orbX = BAR_CX + (activeMode.getHudData(state).balance as number) * BAR_HALF;
+        const winColor = w === 1 ? getAlienColor(state.p1Icon) : getAlienColor(state.p2Icon);
+        burst(winColor, orbX, true); burst(winColor, orbX, true);
+        addShake(1.2); addFlash(winColor, 0.6);
+        sfxWin(w); triggerScorePop(w);
+        if (state.scores[w - 1] >= 2) storage.addWin(w);
+      }
+    }
   } else if (state.phase === 'roundEnd') {
     tickParticles(dt); tickShake(dt); tickFlash(dt); tickScorePop(dt);
-    state.reTimer -= dt;
-    if (state.reTimer <= 0) nextRound();
+    const phaseEvts = phaseController.tick(state, dt);
+    for (const ev of phaseEvts) {
+      if (ev.type === 'round_end_expired') { nextRound(); }
+    }
   } else if (state.phase === 'gameOver' || state.phase === 'nameEntry' || state.phase === 'leaderboard') {
     tickParticles(dt); tickFlash(dt);
   }
@@ -377,6 +306,7 @@ function loop(ts) {
     changeHover,
     lbNewName,
     nameEntryState,
+    hudData: activeMode.getHudData(state),
   });
   requestAnimationFrame(loop);
 }
