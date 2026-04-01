@@ -1,5 +1,6 @@
 import { ctx, W, H } from '../canvas.ts';
 import { hexAlpha } from './CanvasUtils.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 // Deterministic star positions (seeded from sin hash, not Math.random)
 export const BG_STARS: Array<[number, number, number]> = Array.from({ length: 90 }, (_, i) => {
@@ -19,7 +20,7 @@ export function drawBg(balance: number, p1Color: string, p2Color: string): void 
   ctx.fillRect(0, 0, W, H);
 
   // Pixel stars
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = themeManager.get().colors.starColor;
   for (const [sx, sy, ss] of BG_STARS) {
     ctx.fillRect(sx, sy, ss, ss);
   }

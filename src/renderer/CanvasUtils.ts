@@ -1,4 +1,5 @@
 import { ctx } from '../canvas.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 export function hexAlpha(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -25,9 +26,10 @@ export function glowTxt(text: string, x: number, y: number): void {
 // y0/y1 are the top and bottom of the text in current coordinate space
 export function fireGrad(y0: number, y1: number): CanvasGradient {
   const g = ctx.createLinearGradient(0, y0, 0, y1);
-  g.addColorStop(0,    '#ffe600');
-  g.addColorStop(0.35, '#ff9900');
-  g.addColorStop(0.7,  '#ff3300');
-  g.addColorStop(1,    '#cc1100');
+  const fire = themeManager.get().colors.fire;
+  g.addColorStop(0,    fire[0]);
+  g.addColorStop(0.35, fire[1]);
+  g.addColorStop(0.7,  fire[2]);
+  g.addColorStop(1,    fire[3]);
   return g;
 }

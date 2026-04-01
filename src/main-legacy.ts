@@ -1,3 +1,7 @@
+import { themeManager } from './theme/ThemeManager.ts';
+import retro from './theme/themes/retro.theme.json';
+themeManager.load(retro);
+
 import { canvas, ctx, W, H, DPR } from './canvas.ts';
 import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, TAP_STEP, DRIFT_SPD,
          ROUND_TIME, METER_SEGS, METER_H, METER_W, METER_GAP, SEG_H,

@@ -2,6 +2,7 @@ import { ctx, W, H } from '../canvas.ts';
 import { BAR_Y, BAR_CX, BAR_HALF, BAR_H, ORB_R, TIMER_CY, ROUND_TIME } from '../constants.ts';
 import { hexAlpha, shadeHex, txt, glowTxt, fireGrad } from './CanvasUtils.ts';
 import type { GameState } from '../state/GameState.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 export function drawScore(
   state: GameState,
@@ -41,21 +42,21 @@ export function drawScore(
   // VS box
   const vsY = 62;
   ctx.save();
-  ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 10;
+  ctx.shadowColor = themeManager.get().colors.accent; ctx.shadowBlur = 10;
   ctx.beginPath(); ctx.rect(cx - 24, vsY - 14, 48, 28);
   ctx.fillStyle = '#0e0800'; ctx.fill();
   ctx.strokeStyle = 'rgba(255,136,0,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
   ctx.restore();
   ctx.font = '11px "Press Start 2P", monospace';
   ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
-  ctx.fillStyle = '#fff';
+  ctx.fillStyle = themeManager.get().colors.text;
   txt('VS', cx, vsY);
 
   // Round row
   const rowY = 108;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = '7px "Press Start 2P", monospace';
-  ctx.save(); ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 8;
+  ctx.save(); ctx.shadowColor = themeManager.get().colors.accent; ctx.shadowBlur = 8;
   ctx.fillStyle = '#ffcc44';
   glowTxt(`ROUND ${state.round} / 3`, cx, rowY); ctx.restore();
 
@@ -130,7 +131,7 @@ export function drawBar(
 
   // Outer casing
   ctx.save();
-  ctx.fillStyle = '#06040e';
+  ctx.fillStyle = themeManager.get().colors.barFill;
   ctx.beginPath(); ctx.roundRect(bx, by, bw, BAR_H, BAR_H / 2); ctx.fill();
   ctx.strokeStyle = '#334455'; ctx.lineWidth = 2; ctx.stroke();
   ctx.restore();
@@ -298,7 +299,7 @@ export function drawRoundTimer(roundTimer: number): void {
   ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fill();
   if (prog > 0) {
     ctx.beginPath(); ctx.rect(cx - barW / 2, cy - 24, barW * prog, barH);
-    ctx.shadowColor = urgent ? '#ff2020' : '#ff8800'; ctx.shadowBlur = 10;
+    ctx.shadowColor = urgent ? '#ff2020' : themeManager.get().colors.accent; ctx.shadowBlur = 10;
     ctx.fillStyle = urgent ? '#ff2020' : fireGrad(cy - 24, cy - 19); ctx.fill();
   }
   ctx.restore();
@@ -307,7 +308,7 @@ export function drawRoundTimer(roundTimer: number): void {
   const fs = urgent ? 16 : 14;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.save();
-  ctx.shadowColor = urgent ? '#ff2020' : '#ff8800'; ctx.shadowBlur = urgent ? 22 : 14;
+  ctx.shadowColor = urgent ? '#ff2020' : themeManager.get().colors.accent; ctx.shadowBlur = urgent ? 22 : 14;
   ctx.font = `${fs}px "Press Start 2P", monospace`;
   ctx.fillStyle = urgent ? '#ff2020' : fireGrad(cy - fs / 2, cy + fs / 2);
   glowTxt(String(secs), cx, cy);
@@ -331,7 +332,7 @@ export function drawCountdown(state: GameState): void {
   ctx.scale(state.cdScale, state.cdScale);
   if (state.countdown === 0) {
     ctx.font = '48px "Press Start 2P", monospace';
-    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 50;
+    ctx.shadowColor = themeManager.get().colors.accent; ctx.shadowBlur = 50;
     ctx.fillStyle = fireGrad(-24, 24);
   } else {
     ctx.font = '56px "Press Start 2P", monospace';

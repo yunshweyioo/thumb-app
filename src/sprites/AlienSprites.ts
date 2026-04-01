@@ -1,68 +1,15 @@
 import { ctx } from '../canvas.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
-// ── Pixel-art sprite grids ─────────────────────────────────────────────────────
-export const SHAPES = [
-  // 0: Classic wide crab (11×8)
-  [[0,0,1,0,0,0,0,0,1,0,0],
-   [0,0,0,1,0,0,0,1,0,0,0],
-   [0,0,1,1,1,1,1,1,1,0,0],
-   [0,1,1,2,1,1,1,2,1,1,0],
-   [1,1,1,1,1,1,1,1,1,1,1],
-   [1,0,1,1,1,1,1,1,1,0,1],
-   [1,0,1,0,0,0,0,0,1,0,1],
-   [0,0,0,1,1,0,1,1,0,0,0]],
-  // 1: Tall insect (9×8)
-  [[0,0,0,1,0,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,2,1,1,1,2,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,0,1,1,1,1,1,0,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 2: Round blob/ghost (9×8)
-  [[0,0,0,1,1,1,0,0,0],
-   [0,0,1,1,1,1,1,0,0],
-   [0,1,2,1,1,1,2,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,1,1,1,1,1,0],
-   [0,0,1,0,0,0,1,0,0],
-   [0,1,0,0,0,0,0,1,0]],
-  // 3: Spider with legs (9×8)
-  [[1,0,0,0,1,0,0,0,1],
-   [0,1,0,1,1,1,0,1,0],
-   [0,0,1,2,1,2,1,0,0],
-   [0,1,1,1,1,1,1,1,0],
-   [1,1,1,1,1,1,1,1,1],
-   [0,1,1,0,1,0,1,1,0],
-   [0,0,0,1,0,1,0,0,0],
-   [0,0,1,0,0,0,1,0,0]],
-];
-
-// ── Alien definitions ──────────────────────────────────────────────────────────
-export const ALIENS = [
-  {s:0,c:'#8833cc',e:'#ff5555'}, // 0  purple crab
-  {s:1,c:'#aacc33',e:'#ffee00'}, // 1  yellow-green insect
-  {s:2,c:'#ff44aa',e:'#ffff44'}, // 2  pink blob
-  {s:3,c:'#ffaa00',e:'#8833cc'}, // 3  orange spider
-  {s:0,c:'#33ccbb',e:'#8833cc'}, // 4  teal crab
-  {s:1,c:'#cc33cc',e:'#ffee00'}, // 5  magenta insect
-  {s:2,c:'#ffee00',e:'#aa33cc'}, // 6  yellow blob
-  {s:3,c:'#ff5500',e:'#ffff44'}, // 7  orange-red spider
-  {s:0,c:'#ff2266',e:'#ffff44'}, // 8  hot-pink crab
-  {s:1,c:'#66cc22',e:'#cc44cc'}, // 9  green insect
-  {s:2,c:'#4466ee',e:'#ffaa00'}, // 10 blue blob
-  {s:3,c:'#44cccc',e:'#884499'}, // 11 teal spider
-  {s:0,c:'#6644bb',e:'#ff4444'}, // 12 blue-purple crab
-  {s:1,c:'#ee4411',e:'#ffee00'}, // 13 orange-red insect
-  {s:2,c:'#ccee22',e:'#884499'}, // 14 yellow-green blob
-  {s:3,c:'#44aa44',e:'#ffee00'}, // 15 green spider
-];
+// SHAPES and ALIENS are now in retro.theme.json — read via themeManager
+// Re-exported for backwards-compat with any direct imports
+export const SHAPES = themeManager.getShapes();
+export const ALIENS = themeManager.getAliens();
 
 // New helper — replaces P1C() and P2C()
 export function getAlienColor(idx: number): string {
-  return ALIENS[idx]?.c ?? '#8833cc';
+  const aliens = themeManager.getAliens();
+  return aliens[idx]?.c ?? themeManager.get().colors.p1Default;
 }
 
 // ── Per-alien select animation ─────────────────────────────────────────────────
@@ -91,8 +38,10 @@ export function alienAnim(i: number, t: number) {
 }
 
 export function drawAlienSprite(idx: number, cx: number, cy: number, ps: number): void {
-  const a = ALIENS[idx];
-  const grid = SHAPES[a.s];
+  const aliens = themeManager.getAliens();
+  const shapes = themeManager.getShapes();
+  const a = aliens[idx];
+  const grid = shapes[a.s];
   const cols = grid[0].length, rows = grid.length;
   const ox = cx - (cols * ps) / 2;
   const oy = cy - (rows * ps) / 2;

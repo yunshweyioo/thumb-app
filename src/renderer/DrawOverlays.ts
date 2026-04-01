@@ -1,5 +1,6 @@
 import { ctx, W, H } from '../canvas.ts';
 import { hexAlpha, glowTxt, fireGrad } from './CanvasUtils.ts';
+import { themeManager } from '../theme/ThemeManager.ts';
 
 export function drawOverlay(color: string, title: string, sub: string): void {
   // Transparent at top so the score header stays readable, dark from ~130px down
@@ -23,7 +24,7 @@ export function drawOverlay(color: string, title: string, sub: string): void {
   if (sub) {
     ctx.save();
     ctx.font = '8px "Press Start 2P", monospace';
-    ctx.shadowColor = '#ff8800'; ctx.shadowBlur = 8;
+    ctx.shadowColor = themeManager.get().colors.accent; ctx.shadowBlur = 8;
     ctx.fillStyle = '#ffcc44';
     glowTxt(sub, W / 2, H / 2 + 20);
     ctx.restore();
